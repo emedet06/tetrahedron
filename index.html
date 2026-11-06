@@ -176,7 +176,7 @@ footer{font-size:.86rem; color:var(--muted); border-top:1px solid var(--rule); p
           <button class="btn" id="next" aria-label="Sonraki simetri">Sonraki ›</button>
           <span class="step" id="stepnum">1 / 24</span>
         </div>
-        <p class="hint">Dörtyüzlüyü sürükleyerek her yanından bakabilirsiniz.</p>
+        <p class="hint">Sürükleyerek her yanından bakabilirsiniz. Dörtyüzlüyü elle çevirmek için “Kendin dene”ye geçin.</p>
       </div>
 
       <div class="controls" id="try-controls" hidden>
@@ -193,10 +193,14 @@ footer{font-size:.86rem; color:var(--muted); border-top:1px solid var(--rule); p
           <button class="btn math" data-m="1,2">1 ↔ 2</button><button class="btn math" data-m="1,3">1 ↔ 3</button><button class="btn math" data-m="1,4">1 ↔ 4</button><button class="btn math" data-m="2,3">2 ↔ 3</button><button class="btn math" data-m="2,4">2 ↔ 4</button><button class="btn math" data-m="3,4">3 ↔ 4</button>
         </div>
         <div class="row">
+          <span class="label">Ya da elle: dörtyüzlüyü ayna görüntüsüne çevirin, sonra sürükleyerek çevirip yuvasına oturtun</span>
+          <button class="btn" id="flip">Ayna görüntüsüne çevir</button>
+        </div>
+        <div class="row">
           <button class="btn" id="reset">Başa dön</button>
           <button class="btn" id="clear">Tabloyu boşalt</button>
         </div>
-        <p class="hint">Köşeye dokunmak o köşe etrafında, ayrıta dokunmak o ayrıtın ortasından geçen eksen etrafında çevirir. Sürüklemek yalnızca bakış açısını değiştirir.</p>
+        <p class="hint">Dörtyüzlüyü sürükleyerek çevirin; bırakınca yuvasına en yakın simetriyle oturur. Köşeye kısa dokunmak o köşe etrafında, ayrıta dokunmak o ayrıtın ortasından geçen eksen etrafında çevirir. Boş yeri sürüklemek bakış açısını değiştirir.</p>
       </div>
     </section>
 
@@ -393,7 +397,7 @@ function render(overlay){
   for(const [a,b] of EDGES)if(!edgeFront(a,b))h+=line(a,b,"",`stroke="${col(edgePair(a,b))}" stroke-width="2.2" stroke-dasharray="5 5" stroke-linecap="round" opacity=".75" vector-effect="non-scaling-stroke"`);
   // yüzler
   for(const fc of faces){const pts=fc.f.map(k=>`${f3(pp[k][0])},${f3(pp[k][1])}`).join(" ");
-    h+=`<polygon points="${pts}" fill="var(--face)" fill-opacity="${fc.front?0.62:0.35}" stroke="none"/>`;}
+    h+=`<polygon points="${pts}" fill="var(--face)" fill-opacity="${fc.front?0.62:0.35}" stroke="none" data-body="1"${mode==="try"?' style="cursor:grab"':""}/>`;}
   // kılavuz: eksen ya da ayna
   if(overlay){
     if(overlay.axis){const u=overlay.axis,A=proj(cam(mul(u,1.32))),B=proj(cam(mul(u,-1.32)));
@@ -420,7 +424,8 @@ function render(overlay){
 
 /* ---------- hareket ---------- */
 const ease=t=>t<.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2;
-function posAt(d,v,t){
+function posAt(d,v,t,k){
+  if(d.type==="lerp")return add(v,mul(sub(d.to[k],v),ease(t)));
   if(d.type==="rot")return mv(rotMat(d.u,d.ang*ease(t)),v);
   if(d.type==="mirror"){const e=ease(t);return sub(v,mul(d.n,2*e*dot(v,d.n)));}
   if(d.type==="roto"){if(t<0.55)return mv(rotMat(d.u,d.ang*ease(t/0.55)),v);
@@ -435,6 +440,7 @@ function overlayAt(d,t){
 }
 function duration(d){
   if(reduce)return 0;
+  if(d.type==="lerp")return 450;
   if(d.type==="rot")return Math.abs(d.ang)>Math.PI+0.1?2100:(Math.abs(d.ang)>3?1600:1300);
   if(d.type==="mirror")return 1500;
   if(d.type==="roto")return 2700;
@@ -451,7 +457,7 @@ function runMove(d,done){
 function tick(now){
   if(!anim)return;
   const t=Math.min(1,(now-anim.t0)/anim.dur);
-  for(let k=1;k<=4;k++)P[k]=posAt(anim.d,anim.P0[k],t);
+  for(let k=1;k<=4;k++)P[k]=posAt(anim.d,anim.P0[k],t,k);
   render(overlayAt(anim.d,t));
   if(t<1)requestAnimationFrame(tick);else{const cb=anim.done;anim=null;cb();}
 }
@@ -491,7 +497,7 @@ function settle(){P=homeP();render(null);seen.add(sigKey(state));refreshGrid();s
 /* ---------- İzle ---------- */
 function flash(){stage.classList.add("dim");setTimeout(()=>stage.classList.remove("dim"),170);}
 function tourGo(i){
-  clearTimeout(tourTimer);clearTimeout(startTimer);anim=null;
+  clearTimeout(tourTimer);clearTimeout(startTimer);anim=null;Mrel=null;
   tourIdx=(i+24)%24;const g=TOUR[tourIdx];
   if(sigKey(state)!=="1234"){flash();}
   state=[0,1,2,3,4];P=homeP();render(null);refreshGrid();showTotal();
@@ -504,8 +510,35 @@ function tourGo(i){
 function setPlaying(p){playing=p;$("play").textContent=p?"Duraklat":"Oynat";clearTimeout(tourTimer);if(p&&!anim)tourGo(tourIdx+1);}
 
 /* ---------- Kendin dene ---------- */
+/* ---------- elle çevirme (Kendin dene) ---------- */
+let Mrel=null,Pbase=null,flipping=false;     // elde tutulan dörtyüzlünün, son oturduğu duruşa göre dönüşümü
+const I3=()=>[[1,0,0],[0,1,0],[0,0,1]], tr3=M=>[0,1,2].map(i=>[0,1,2].map(j=>M[j][i]));
+function holdStart(){if(!Mrel){Pbase=homeP();Mrel=I3();}}
+function holdApply(){for(let k=1;k<=4;k++)P[k]=mv(Mrel,Pbase[k]);render(null);}
+function holdRotate(dx,dy){const Rc=mm(rotMat([0,1,0],dx*0.011),rotMat([1,0,0],dy*0.011));Mrel=mm(mm(tr3(C),mm(Rc,C)),Mrel);holdApply();}
+function snapHeld(){   // bırakınca: en yakın simetri duruşuna oturur
+  if(!Mrel)return;const d=det3(Mrel)>0?1:-1;let best=null,bd=Infinity;
+  for(const g of GROUP){if(g.det!==d)continue;let q=0;for(let i=0;i<3;i++)for(let j=0;j<3;j++)q+=(Mrel[i][j]-g.M[i][j])**2;if(q<bd){bd=q;best=g;}}
+  Mrel=null;
+  const inv=[0];for(let k=1;k<=4;k++)inv[state[k]]=k;
+  const rho=[0],ns=[0],to={};for(let k=1;k<=4;k++){rho[k]=inv[best.sig[state[k]]];ns[k]=best.sig[state[k]];to[k]=HOME[ns[k]].slice();}
+  const name=d<0?"Ayna görüntüsünü çevirip yuvasına oturttunuz":"Elle çevirip yuvasına oturttunuz";
+  showMove(name,best.kind,rho);$("caption").textContent=name;
+  runMove({type:"lerp",to},()=>{state=ns;settle();});
+}
+function flipHeld(){   // ayna görüntüsüne çevir: yandaki dikey bir aynadan geçiyormuş gibi yerinde yansır
+  if(anim||flipping)return;holdStart();flipping=true;const M0=Mrel,t0=performance.now(),dur=reduce?0:750;
+  $("caption").textContent="Aynadan geçiyor…";
+  const step=now=>{const t=dur?Math.min(1,(now-t0)/dur):1,e=ease(t),D=[[1-2*e,0,0],[0,1,0],[0,0,1]];
+    Mrel=mm(mm(tr3(C),mm(D,C)),M0);holdApply();
+    if(t<1)requestAnimationFrame(step);
+    else{flipping=false;$("caption").textContent="Ayna görüntüsü: şimdi sürükleyerek çevirip yuvasına oturtun.";
+      $("movename").textContent="Ayna görüntüsü (henüz yuvada değil)";}};
+  requestAnimationFrame(step);
+}
 function applySpatial(M,d,name){
-  if(anim)return;
+  if(anim||flipping)return;
+  if(Mrel){snapHeld();return;}   // elde tutuluyorsa önce yuvasına otursun
   const g=findByM(roundM(M));if(!g)return;
   const inv=[0];for(let k=1;k<=4;k++)inv[state[k]]=k;
   const rho=[0];for(let k=1;k<=4;k++)rho[k]=inv[g.sig[state[k]]];
@@ -522,7 +555,7 @@ function mirror(a,b){const n=unit(sub(HOME[state[a]],HOME[state[b]]));
   applySpatial(M,{type:"mirror",n},`${a} ile ${b} köşelerini takas eden ayna`);}
 
 function setMode(m){
-  mode=m;clearTimeout(tourTimer);clearTimeout(startTimer);anim=null;
+  mode=m;clearTimeout(tourTimer);clearTimeout(startTimer);anim=null;Mrel=null;
   $("tab-tour").setAttribute("aria-selected",m==="tour");$("tab-try").setAttribute("aria-selected",m==="try");
   $("tour-controls").hidden=m!=="tour";$("try-controls").hidden=m!=="try";
   state=[0,1,2,3,4];P=homeP();render(null);
@@ -532,18 +565,23 @@ function setMode(m){
 
 /* ---------- olaylar ---------- */
 let drag=null;
-stage.addEventListener("pointerdown",e=>{drag={x:e.clientX,y:e.clientY,moved:false,target:e.target};try{stage.setPointerCapture(e.pointerId);}catch(_){}});
+const tetraTarget=t=>!!(t&&t.dataset&&(t.dataset.k||t.dataset.a||t.dataset.body));
+stage.addEventListener("pointerdown",e=>{drag={x:e.clientX,y:e.clientY,moved:false,target:e.target,tetra:mode==="try"&&tetraTarget(e.target)&&!anim&&!flipping};try{stage.setPointerCapture(e.pointerId);}catch(_){}});
 stage.addEventListener("pointermove",e=>{if(!drag)return;const dx=e.clientX-drag.x,dy=e.clientY-drag.y;
   if(!drag.moved&&Math.hypot(dx,dy)<5)return;
-  if(!drag.moved){drag.moved=true;stage.classList.add("dragging");}
-  C=mm(rotMat([0,1,0],dx*0.011),mm(rotMat([1,0,0],dy*0.011),C));drag.x=e.clientX;drag.y=e.clientY;
-  if(!anim)render(null);});
+  if(!drag.moved){drag.moved=true;stage.classList.add("dragging");if(drag.tetra)holdStart();}
+  drag.x=e.clientX;drag.y=e.clientY;
+  if(drag.tetra){holdRotate(dx,dy);return;}              // dörtyüzlüyü çevir
+  C=mm(rotMat([0,1,0],dx*0.011),mm(rotMat([1,0,0],dy*0.011),C));   // bakış açısını değiştir
+  if(!anim&&!flipping){if(Mrel)holdApply();else render(null);}});
 const endDrag=e=>{if(!drag)return;const d=drag;drag=null;stage.classList.remove("dragging");
+  if(d.tetra&&d.moved){snapHeld();return;}
   if(d.moved||mode!=="try")return;const t=d.target;
   if(t&&t.dataset&&t.dataset.k)rotVertex(+t.dataset.k);
   else if(t&&t.dataset&&t.dataset.a)halfTurn(+t.dataset.a,+t.dataset.b);};
 stage.addEventListener("pointerup",endDrag);
-stage.addEventListener("pointercancel",()=>{drag=null;stage.classList.remove("dragging");});
+stage.addEventListener("pointercancel",()=>{const d=drag;drag=null;stage.classList.remove("dragging");if(d&&d.tetra&&d.moved)snapHeld();});
+$("flip").addEventListener("click",flipHeld);
 
 $("tab-tour").addEventListener("click",()=>{if(mode!=="tour")setMode("tour");});
 $("tab-try").addEventListener("click",()=>{if(mode!=="try")setMode("try");});
@@ -553,11 +591,11 @@ $("prev").addEventListener("click",()=>{playing=false;$("play").textContent="Oyn
 document.querySelectorAll("[data-v]").forEach(b=>b.addEventListener("click",()=>rotVertex(+b.dataset.v)));
 document.querySelectorAll("[data-h]").forEach(b=>b.addEventListener("click",()=>{const pr=PAIRS[+b.dataset.h][0];halfTurn(pr[0],pr[1]);}));
 document.querySelectorAll("[data-m]").forEach(b=>b.addEventListener("click",()=>{const [a,c]=b.dataset.m.split(",").map(Number);mirror(a,c);}));
-$("reset").addEventListener("click",()=>{if(anim)return;state=[0,1,2,3,4];showMove("Başlangıç","id",[0,1,2,3,4]);settle();});
+$("reset").addEventListener("click",()=>{if(anim||flipping)return;Mrel=null;state=[0,1,2,3,4];showMove("Başlangıç","id",[0,1,2,3,4]);settle();});
 $("clear").addEventListener("click",()=>{seen.clear();seen.add(sigKey(state));refreshGrid();});
 
 /* test ve inceleme için */
-window.__dortyuzlu={GROUP,TOUR,inducedTau,cycleStr};
+window.__dortyuzlu={GROUP,TOUR,inducedTau,cycleStr,state:()=>state.slice(),held:()=>!!Mrel,det:()=>Mrel?det3(Mrel):1};
 
 /* ---------- başlat ---------- */
 initCamera();buildGrid();

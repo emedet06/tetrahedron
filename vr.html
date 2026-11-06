@@ -22,6 +22,11 @@
   .help{position:fixed; left:0; right:0; bottom:0; z-index:5; margin:0; padding:10px max(14px, env(safe-area-inset-left,0px)) calc(10px + env(safe-area-inset-bottom,0px)); font-size:.86rem; color:var(--muted); background:var(--bar); border-top:1px solid var(--rule)}
   #msg{font-size:.84rem; color:var(--muted); flex-basis:100%}
   [hidden]{display:none!important}
+  .seg{display:inline-flex}
+  .bar .seg button{border-radius:0}
+  .bar .seg button:first-child{border-radius:3px 0 0 3px}
+  .bar .seg button:last-child{border-radius:0 3px 3px 0; margin-left:-1px}
+  .bar .seg button[aria-pressed="true"]{background:var(--ink); color:var(--bg); border-color:var(--ink)}
   #xr-overlay{position:fixed; top:0; left:0; right:0; display:flex; gap:10px; align-items:center; flex-wrap:wrap; padding:calc(10px + env(safe-area-inset-top,0px)) 14px 10px; color:#fff; font-size:.86rem; text-shadow:0 1px 3px rgba(0,0,0,.8)}
   #xr-overlay button{font:600 .9rem inherit; font-family:inherit; color:var(--bg); background:var(--ink); border:0; border-radius:3px; padding:8px 12px}
   @media (max-width:600px){ .bar strong{font-size:.95rem} .bar button,.bar a{padding:5px 10px; font-size:.85rem} #msg{font-size:.76rem} .help{font-size:.76rem; padding-top:7px} }
@@ -32,11 +37,12 @@
   <strong>Dörtyüzlünün 24 simetrisi</strong>
   <button class="xr" id="btn-vr" hidden>VR'da aç</button>
   <button class="xr" id="btn-ar" hidden>Odanızda aç (AR)</button>
+  <span class="seg" role="group" aria-label="Dörtyüzlüyü sürükleyince"><button id="hm-rot" aria-pressed="true">Çevir</button><button id="hm-move" aria-pressed="false">Taşı</button></span>
   <a href="./">2B sayfa</a>
   <span id="msg"></span>
 </div>
 <div id="xr-overlay" hidden><button id="xr-exit">AR'dan çık</button><span>Bir köşeye, ayrıta ya da düğmeye dokunun. Paneller iki yanda; telefonu çevirerek bakın.</span></div>
-<p class="help" id="help">Sürükleyerek etrafında dönün, iki parmakla ya da tekerlekle yaklaşın. Bir köşeye, bir ayrıta ya da hamle düğmelerine dokunun.</p>
+<p class="help" id="help">Dörtyüzlüyü sürükleyin: çevrilir. Shift ya da sağ tuşla (dokunmatikte “Taşı”) sürükleyin: taşınır; sağdaki aynadan geçirirseniz ayna görüntüsüne dönüşür. Yuvaya bırakınca en yakın simetriye oturur. Boş yeri sürüklemek bakış açısını değiştirir; köşeye kısa dokunmak hamle yapar.</p>
 
 <script type="importmap">
 { "imports": {
@@ -196,7 +202,7 @@ const sockTags=[1,2,3,4].map(k=>{const t=canvasTex(128,128,(ctx,w,h)=>{ctx.clear
 /* içinden geçilebilen ayna (gözlükte tutma modu için) ve aynadaki görüntü */
 const MW=0.36,MH=0.46;
 const mirrorPortal=new THREE.Group();world.add(mirrorPortal);
-mirrorPortal.position.set(0.5,1.38,-0.9);mirrorPortal.rotation.y=-0.6;mirrorPortal.visible=false;
+mirrorPortal.position.set(0.5,1.38,-0.9);mirrorPortal.rotation.y=-0.6;mirrorPortal.visible=true;
 const glassMat=new THREE.MeshBasicMaterial({color:0xA9CBEA,transparent:true,opacity:.2,side:THREE.DoubleSide,depthWrite:false});
 mirrorPortal.add(new THREE.Mesh(new THREE.PlaneGeometry(MW,MH),glassMat));
 const frameMat=new THREE.MeshStandardMaterial({color:0xC9D6D1,emissive:0x000000,roughness:.4,metalness:.2});
@@ -332,6 +338,8 @@ function makeBtn(label,x,y,w,h,action,opt={}){
  const w2=(BW-0.07-g)/2;
  makeBtn("Başa dön",-BW/2+0.035+w2/2,-0.32,w2,0.08,()=>manual(resetHome));
  var tourBtn=makeBtn(()=>playing?"Turu durdur":"Turu oynat",-BW/2+0.035+w2*1.5+g,-0.32,w2,0.08,toggleTour,{strong:true});}
+const exitBtn=makeBtn("AR'dan çık",0,0,0.24,0.08,()=>{const s_=renderer.xr.getSession();if(s_)s_.end();},{strong:true});
+world.add(exitBtn);exitBtn.position.set(0,0.98,-0.95);exitBtn.visible=false;
 
 /* ================= yerleşim ================= */
 function layout(xr){
@@ -397,32 +405,41 @@ function startGrab(c,hitObj,viaSqueeze){
   grab={ctrl:c,hit:hitObj,moved:!!viaSqueeze,offset:new THREE.Matrix4().copy(c.matrixWorld).invert().multiply(model.matrixWorld),
         p0:new THREE.Vector3().setFromMatrixPosition(c.matrixWorld),q0:new THREE.Quaternion().setFromRotationMatrix(c.matrixWorld),lastZ:null};
 }
+function linOf(m){const e=m.elements;return [[e[0],e[4],e[8]],[e[1],e[5],e[9]],[e[2],e[6],e[10]]];}
+function modelWorldNow(){rig.updateMatrixWorld(true);return model.matrixWorld.clone();}
+function setModelWorld(W){model.matrix.copy(new THREE.Matrix4().copy(rig.matrixWorld).invert().multiply(W));model.matrixWorldNeedsUpdate=true;}
+// W0'dan W1'e giderken merkez aynanın camından geçtiyse: kendi merkezinden aynaya paralel düzleme göre yansır (el değiştirir), yoluna devam eder
+function crossMirror(W0,W1){
+  if(!mirrorPortal.visible)return W1;
+  const c0=new THREE.Vector3().setFromMatrixPosition(W0),c1=new THREE.Vector3().setFromMatrixPosition(W1);
+  const a=sideOfMirror(c0),b=sideOfMirror(c1);
+  if(a.z===0||Math.sign(a.z)===Math.sign(b.z))return W1;
+  const t=a.z/(a.z-b.z),x=a.x+(b.x-a.x)*t,y=a.y+(b.y-a.y)*t;
+  if(Math.abs(x)>MW/2+0.03||Math.abs(y)>MH/2+0.03)return W1;
+  const W=W1.clone().premultiply(reflAbout(mirrorNormal(),c1));
+  mirrorFlash=performance.now();
+  const mirrored=det3(linOf(new THREE.Matrix4().copy(rig.matrixWorld).invert().multiply(W)))<0;
+  setInfo(mirrored?"Aynadan geçti: artık ayna görüntüsü":"Aynadan geri geçti: yeniden asıl hâli",info.kind,info.rho,"Çevirip yuvasına oturtun.");
+  return W;
+}
 function updateGrab(){
   const c=grab.ctrl;c.updateMatrixWorld(true);
   if(!grab.moved){const p=new THREE.Vector3().setFromMatrixPosition(c.matrixWorld),q=new THREE.Quaternion().setFromRotationMatrix(c.matrixWorld);
     if(p.distanceTo(grab.p0)>0.02*world.scale.x||q.angleTo(grab.q0)>0.12)grab.moved=true;else return;}
-  const W=new THREE.Matrix4().copy(c.matrixWorld).multiply(grab.offset);   // modelin istenen dünya matrisi
-  if(mirrorPortal.visible){
-    const cen=new THREE.Vector3().setFromMatrixPosition(W),loc=sideOfMirror(cen);
-    if(grab.lastZ!==null&&Math.sign(loc.z)!==Math.sign(grab.lastZ)&&Math.abs(loc.x)<MW/2+0.03&&Math.abs(loc.y)<MH/2+0.03){
-      // aynadan geçti: kendi merkezinden aynaya paralel düzleme göre yansır (el değiştirir), yoluna devam eder
-      const Rf=reflAbout(mirrorNormal(),cen);
-      W.premultiply(Rf);
-      grab.offset.copy(new THREE.Matrix4().copy(c.matrixWorld).invert().multiply(W));
-      mirrorFlash=performance.now();
-      setInfo(det3(linOf(new THREE.Matrix4().copy(rig.matrixWorld).invert().multiply(W)))<0?"Aynadan geçti: artık ayna görüntüsü":"Aynadan geri geçti: yeniden asıl hâli",info.kind,info.rho,"Çevirip yuvasına oturtun.");
-    }
-    grab.lastZ=loc.z;
-  }
-  model.matrix.copy(new THREE.Matrix4().copy(rig.matrixWorld).invert().multiply(W));model.matrixWorldNeedsUpdate=true;
+  const W0=modelWorldNow();let W=new THREE.Matrix4().copy(c.matrixWorld).multiply(grab.offset);   // modelin istenen dünya matrisi
+  const W2=crossMirror(W0,W);
+  if(W2!==W){grab.offset.copy(new THREE.Matrix4().copy(c.matrixWorld).invert().multiply(W2));W=W2;}
+  setModelWorld(W);
 }
-function linOf(m){const e=m.elements;return [[e[0],e[4],e[8]],[e[1],e[5],e[9]],[e[2],e[6],e[10]]];}
+function placeOrFloat(){ // bırakınca: yuvaya ~22 cm'den yakınsa en yakın simetriye oturur, değilse havada kalır
+  const e=model.matrix.elements;
+  if(Math.hypot(e[12],e[13],e[14])<0.9)snapToSocket();
+  else{floating=true;setInfo("Dörtyüzlü yuvanın dışında",info.kind,info.rho,"Yerine koymak için yeniden tutup yuvaya yaklaştırın."+(det3(modelLinear())<0?" Şu an ayna görüntüsü.":""));}
+}
 function endGrab(){
   const g_=grab;grab=null;if(!g_)return;
   if(!g_.moved){if(g_.hit&&g_.hit.userData.type!=="body")activate(g_.hit);return;}   // kısa basış: eski hamle
-  const e=model.matrix.elements;
-  if(Math.hypot(e[12],e[13],e[14])<0.9)snapToSocket();   // yuvaya ~22 cm'den yakın: otur
-  else{floating=true;setInfo("Dörtyüzlü yuvanın dışında",info.kind,info.rho,"Yerine koymak için yeniden tutup yuvaya yaklaştırın."+(det3(modelLinear())<0?" Şu an ayna görüntüsü.":""));}
+  placeOrFloat();
 }
 function snapToSocket(){
   const L=modelLinear(),d=det3(L)>0?1:-1,e=model.matrix.elements,T=[e[12],e[13],e[14]];
@@ -438,19 +455,58 @@ function snapToSocket(){
 
 /* ================= seçme: fare, dokunma, kumanda, el ================= */
 const ray=new THREE.Raycaster(),tmpM=new THREE.Matrix4();
-const pickables=()=>[...vertObjs.map(v=>v.hit),...edgeObjs.map(e=>e.hit),...buttons];
+const pickables=()=>[...vertObjs.map(v=>v.hit),...edgeObjs.map(e=>e.hit),...buttons].filter(o=>o.visible&&(!o.parent||o.parent.visible));
 function hitFromRay(){const hs=ray.intersectObjects(pickables(),false);if(!hs.length)return null;
   const v=hs.find(h=>h.object.userData.type==="vertex");return v&&v.distance<hs[0].distance+0.06?v:hs[0];}
 function activate(obj){const u=obj.userData;if(u.type==="btn")u.action();else if(u.type==="vertex")manual(()=>rotVertex(u.k));else if(u.type==="edge")manual(()=>halfTurn(u.a,u.b));}
 function setHover(list){hovered=new Set(list);for(const b of buttons)b.material.color.set(hovered.has(b)?0xC9DBFF:0xffffff);if(!anim)drawModel(null);}
 // fare / dokunma
-const ndc=new THREE.Vector2();let down=null;
+const ndc=new THREE.Vector2();let press=null,handMode="rotate";
 function rayFromPointer(e){const r=renderer.domElement.getBoundingClientRect();ndc.set(((e.clientX-r.left)/r.width)*2-1,-((e.clientY-r.top)/r.height)*2+1);ray.setFromCamera(ndc,camera);}
-renderer.domElement.addEventListener("pointerdown",e=>{down={x:e.clientX,y:e.clientY};});
-renderer.domElement.addEventListener("pointerup",e=>{if(!down)return;const moved=Math.hypot(e.clientX-down.x,e.clientY-down.y)>6;down=null;if(moved||renderer.xr.isPresenting)return;
-  rayFromPointer(e);const h=hitFromRay();if(h)activate(h.object);});
-renderer.domElement.addEventListener("pointermove",e=>{if(renderer.xr.isPresenting||e.pointerType==="touch")return;rayFromPointer(e);const h=hitFromRay();
-  renderer.domElement.style.cursor=h?"pointer":"grab";const want=h?[h.object]:[];if(idKey([...hovered])!==idKey(want))setHover(want);});
+const isTetra=o=>!!o&&(o.userData.type==="vertex"||o.userData.type==="edge"||o.userData.type==="body");
+function objUnderPointer(e){rayFromPointer(e);const h=hitFromRay();if(h)return h.object;return ray.intersectObject(faceMesh,false).length?faceMesh:null;}
+window.addEventListener("pointerdown",e=>{
+  if(e.target!==renderer.domElement||renderer.xr.isPresenting||press)return;
+  const obj=objUnderPointer(e);
+  press={id:e.pointerId,x:e.clientX,y:e.clientY,lx:e.clientX,ly:e.clientY,obj,moved:false,holding:false,move:e.shiftKey||e.button===2||handMode==="move"};
+  if(isTetra(obj))controls.enabled=false;            // dörtyüzlü sürüklenecek; bakış açısı değişmesin
+},{capture:true});
+renderer.domElement.addEventListener("contextmenu",e=>e.preventDefault());
+function dragTetra(dx,dy,move){
+  const W0=modelWorldNow(),c=new THREE.Vector3().setFromMatrixPosition(W0);
+  const up=new THREE.Vector3(0,1,0).applyQuaternion(camera.quaternion),right=new THREE.Vector3(1,0,0).applyQuaternion(camera.quaternion);
+  let W;
+  if(move){const k=2*camera.position.distanceTo(c)*Math.tan(THREE.MathUtils.degToRad(camera.fov/2))/renderer.domElement.clientHeight;
+    const d=right.multiplyScalar(dx*k).add(up.multiplyScalar(-dy*k));
+    W=crossMirror(W0,new THREE.Matrix4().makeTranslation(d.x,d.y,d.z).multiply(W0));}
+  else{const r=new THREE.Quaternion().setFromAxisAngle(up,dx*0.012).multiply(new THREE.Quaternion().setFromAxisAngle(right,dy*0.012));
+    W=new THREE.Matrix4().makeTranslation(c.x,c.y,c.z).multiply(new THREE.Matrix4().makeRotationFromQuaternion(r)).multiply(new THREE.Matrix4().makeTranslation(-c.x,-c.y,-c.z)).multiply(W0);}
+  setModelWorld(W);
+}
+window.addEventListener("pointermove",e=>{
+  if(press&&e.pointerId===press.id){
+    if(!press.moved&&Math.hypot(e.clientX-press.x,e.clientY-press.y)>6)press.moved=true;
+    if(press.moved&&isTetra(press.obj)){
+      if(!press.holding){
+        if(anim){if(anim.manual){press.obj=null;controls.enabled=true;return;}finishAnimNow();}
+        if(playing){playing=false;tourBtn.userData.tex.redraw();clearTimeout(tourTimer);clearTimeout(startTimer);}
+        press.holding=true;}
+      dragTetra(e.clientX-press.lx,e.clientY-press.ly,press.move);
+    }
+    press.lx=e.clientX;press.ly=e.clientY;return;
+  }
+  if(e.target!==renderer.domElement||renderer.xr.isPresenting||e.pointerType==="touch")return;   // fareyle üzerine gelme
+  const over=objUnderPointer(e);
+  renderer.domElement.style.cursor=over?(isTetra(over)?"move":"pointer"):"grab";
+  const want=over&&over!==faceMesh?[over]:[];if(idKey([...hovered])!==idKey(want))setHover(want);
+});
+function endPress(e){
+  if(!press||e.pointerId!==press.id)return;const p=press;press=null;controls.enabled=true;
+  if(p.holding){placeOrFloat();return;}
+  if(!p.moved&&p.obj&&p.obj!==faceMesh&&e.type==="pointerup"){const o=objUnderPointer(e);if(o===p.obj)activate(o);}
+}
+window.addEventListener("pointerup",endPress);
+window.addEventListener("pointercancel",endPress);
 // XR kumandaları ve eller
 const controllers=[],modelFactory=new XRControllerModelFactory();
 const rayLineGeo=new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0,0,0),new THREE.Vector3(0,0,-1)]);
@@ -496,27 +552,28 @@ async function startXR(mode){
   let session=null;
   const phoneAR=mode==="immersive-ar"&&!isHeadset;
   try{
-    const opts=phoneAR?{optionalFeatures:["dom-overlay"],domOverlay:{root:xrOverlay}}:{optionalFeatures:["local-floor","bounded-floor","hand-tracking"]};
+    const opts=phoneAR?{}:{optionalFeatures:["local-floor","bounded-floor","hand-tracking"]};   // telefonda hiçbir ek özellik isteme
     session=await navigator.xr.requestSession(mode,opts);
     // gerçekten hangi referans uzayı var? (telefonlarda çoğu zaman yalnızca 'local')
     let space="local";
     if(!phoneAR){try{await session.requestReferenceSpace("local-floor");space="local-floor";}catch(_){}}
     xrMode=mode;
     if(mode==="immersive-ar"){scene.background=null;floor.visible=false;}
-    if(phoneAR){world.scale.setScalar(0.55);world.position.set(0,-0.86,-0.08);xrOverlay.hidden=false;} // dörtyüzlü telefonun ~60 cm önünde
+    if(phoneAR){world.scale.setScalar(0.55);world.position.set(0,-0.86,-0.08);exitBtn.visible=true;} // dörtyüzlü telefonun ~60 cm önünde
     else if(space==="local"){resetWorld();world.position.y=-1.45;}
     else resetWorld();
     renderer.xr.setReferenceSpaceType(space);
     await renderer.xr.setSession(session);
     controls.enabled=false;layout(true);mirrorPortal.visible=!phoneAR;
-    session.addEventListener("end",()=>{mirrorPortal.visible=false;grab=null;if(floating)returnToSocket();xrMode=null;scene.background=BG;floor.visible=true;resetWorld();xrOverlay.hidden=true;controls.enabled=true;layout(false);});
+    session.addEventListener("end",()=>{mirrorPortal.visible=true;exitBtn.visible=false;grab=null;if(floating)returnToSocket();xrMode=null;scene.background=BG;floor.visible=true;resetWorld();xrOverlay.hidden=true;controls.enabled=true;layout(false);});
   }catch(err){
-    msg.textContent="Oturum başlatılamadı: "+(err&&err.message?err.message:err);
+    msg.textContent="Oturum başlatılamadı ("+(err&&err.message?err.message:err)+")."+(phoneAR?" Telefonda AR için Chrome ve güncel “Google Play Services for AR” (ARCore) uygulaması gerekir; kamera iznini de verin.":"");exitBtn.visible=false;
     scene.background=BG;floor.visible=true;resetWorld();xrOverlay.hidden=true;
     if(session){try{await session.end();}catch(_){}}
   }
 }
 bVR.addEventListener("click",()=>startXR("immersive-vr"));
+for(const [id,m] of [["hm-rot","rotate"],["hm-move","move"]])document.getElementById(id).addEventListener("click",()=>{handMode=m;document.getElementById("hm-rot").setAttribute("aria-pressed",m==="rotate");document.getElementById("hm-move").setAttribute("aria-pressed",m==="move");});
 bAR.addEventListener("click",()=>startXR("immersive-ar"));
 checkXR();
 
