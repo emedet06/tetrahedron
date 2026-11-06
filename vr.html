@@ -152,25 +152,27 @@ function fillRich(ctx,t,x,y){const fs=fsOf(ctx),ay=ctx.textBaseline==="middle"?y
   return cx-x;}
 function rr(ctx,x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath();}
 
+/* hareket eden dörtyüzlü: tutulunca bütün olarak taşınan grup */
+const model=new THREE.Group();model.matrixAutoUpdate=false;rig.add(model);
 /* yüzler */
 const faceGeo=new THREE.BufferGeometry();faceGeo.setAttribute("position",new THREE.BufferAttribute(new Float32Array(36),3));
 const faceMesh=new THREE.Mesh(faceGeo,new THREE.MeshStandardMaterial({color:0xF4F8F6,emissive:0x26312e,transparent:true,opacity:0.34,side:THREE.DoubleSide,depthWrite:false,roughness:.9}));
-rig.add(faceMesh);
+model.add(faceMesh);faceMesh.userData.type="body";
 /* ayrıtlar */
 const cylGeo=new THREE.CylinderGeometry(1,1,1,14);
 const edgeMats=COL.y.map(c=>new THREE.MeshStandardMaterial({color:c,emissive:c,emissiveIntensity:.35,roughness:.45}));
 const hitMat=new THREE.MeshBasicMaterial({visible:false});
-const edgeObjs=EDGES.map(([a,b])=>{const j=edgePair(a,b);const m=new THREE.Mesh(cylGeo,edgeMats[j]);m.userData.r=0.032;rig.add(m);
-  const h=new THREE.Mesh(cylGeo,hitMat);h.userData={type:"edge",a,b,r:0.1};rig.add(h);
+const edgeObjs=EDGES.map(([a,b])=>{const j=edgePair(a,b);const m=new THREE.Mesh(cylGeo,edgeMats[j]);m.userData.r=0.032;model.add(m);
+  const h=new THREE.Mesh(cylGeo,hitMat);h.userData={type:"edge",a,b,r:0.1};model.add(h);
   const tag=canvasTex(128,96,(ctx,w,hh)=>{ctx.clearRect(0,0,w,hh);ctx.font=`italic 600 64px ${FMATH}`;ctx.textAlign="center";ctx.textBaseline="middle";
     ctx.lineWidth=8;ctx.strokeStyle=COL.bg;ctx.strokeText(Y(j),w/2,hh/2);ctx.fillStyle=COL.y[j];ctx.fillText(Y(j),w/2,hh/2);});
-  const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:tag.tex,transparent:true,depthWrite:false}));sp.scale.set(0.2,0.15,1);rig.add(sp);
+  const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:tag.tex,transparent:true,depthWrite:false}));sp.scale.set(0.2,0.15,1);model.add(sp);
   return {a,b,j,mesh:m,hit:h,tag:sp,tagTex:tag};});
 /* köşeler */
 const vertObjs=[1,2,3,4].map(k=>{const t=canvasTex(128,128,(ctx,w,h)=>{ctx.clearRect(0,0,w,h);ctx.beginPath();ctx.arc(64,64,56,0,7);ctx.fillStyle=COL.disc;ctx.fill();
     ctx.lineWidth=7;ctx.strokeStyle=COL.discInk;ctx.stroke();ctx.fillStyle=COL.discInk;ctx.font=`600 72px ${FMATH}`;ctx.textAlign="center";ctx.textBaseline="middle";ctx.fillText(String(k),64,68);});
-  const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:t.tex,depthTest:false,transparent:true}));sp.renderOrder=20;sp.scale.setScalar(0.24);rig.add(sp);
-  const h=new THREE.Mesh(new THREE.SphereGeometry(0.17,12,8),hitMat);h.userData={type:"vertex",k};rig.add(h);
+  const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:t.tex,depthTest:false,transparent:true}));sp.renderOrder=20;sp.scale.setScalar(0.24);model.add(sp);
+  const h=new THREE.Mesh(new THREE.SphereGeometry(0.17,12,8),hitMat);h.userData={type:"vertex",k};model.add(h);
   return {k,sprite:sp,hit:h,tex:t};});
 /* kılavuzlar: eksen ve ayna */
 const axisGeo=new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0,0,-1.45),new THREE.Vector3(0,0,1.45)]);
@@ -190,6 +192,45 @@ const SOCK=1.1;
 const sockTags=[1,2,3,4].map(k=>{const t=canvasTex(128,128,(ctx,w,h)=>{ctx.clearRect(0,0,w,h);rr(ctx,10,10,108,108,18);ctx.fillStyle=COL.panel;ctx.fill();ctx.lineWidth=7;ctx.strokeStyle=COL.muted;ctx.stroke();
     ctx.fillStyle=COL.muted;ctx.font=`600 66px ${FBODY}`;ctx.textAlign="center";ctx.textBaseline="middle";ctx.fillText(String(k),64,68);});
   const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:t.tex,depthTest:false,transparent:true}));sp.renderOrder=15;sp.scale.setScalar(0.17);sp.position.set(...mul(HOME[k],1.33));rig.add(sp);return t;});
+
+/* içinden geçilebilen ayna (gözlükte tutma modu için) ve aynadaki görüntü */
+const MW=0.36,MH=0.46;
+const mirrorPortal=new THREE.Group();world.add(mirrorPortal);
+mirrorPortal.position.set(0.5,1.38,-0.9);mirrorPortal.rotation.y=-0.6;mirrorPortal.visible=false;
+const glassMat=new THREE.MeshBasicMaterial({color:0xA9CBEA,transparent:true,opacity:.2,side:THREE.DoubleSide,depthWrite:false});
+mirrorPortal.add(new THREE.Mesh(new THREE.PlaneGeometry(MW,MH),glassMat));
+const frameMat=new THREE.MeshStandardMaterial({color:0xC9D6D1,emissive:0x000000,roughness:.4,metalness:.2});
+for(const [w,h,x,y] of [[MW+0.03,0.015,0,MH/2+0.0075],[MW+0.03,0.015,0,-MH/2-0.0075],[0.015,MH,MW/2+0.0075,0],[0.015,MH,-MW/2-0.0075,0]]){
+  const b=new THREE.Mesh(new THREE.BoxGeometry(w,h,0.015),frameMat);b.position.set(x,y,0);mirrorPortal.add(b);}
+const mirLabel=canvasTex(1024,200,(ctx,w,h)=>{ctx.clearRect(0,0,w,h);ctx.textAlign="center";ctx.fillStyle=COL.ink;ctx.font=`700 64px ${FBODY}`;ctx.fillText("AYNA",w/2,70);
+  ctx.fillStyle=COL.muted;ctx.font=`400 40px ${FBODY}`;ctx.fillText("Dörtyüzlüyü içinden geçirin;",w/2,128);ctx.fillText("geri getirirken yanından dolaşın.",w/2,178);});
+{const lm_=new THREE.Mesh(new THREE.PlaneGeometry(0.42,0.082),new THREE.MeshBasicMaterial({map:mirLabel.tex,transparent:true}));lm_.position.set(0,MH/2+0.07,0);mirrorPortal.add(lm_);}
+let mirrorFlash=0;
+function reflAbout(n,c){const d=2*n.dot(c),x=n.x,y=n.y,z=n.z;return new THREE.Matrix4().set(1-2*x*x,-2*x*y,-2*x*z,d*x, -2*y*x,1-2*y*y,-2*y*z,d*y, -2*z*x,-2*z*y,1-2*z*z,d*z, 0,0,0,1);}
+function mirrorNormal(){return new THREE.Vector3(0,0,1).applyQuaternion(mirrorPortal.getWorldQuaternion(new THREE.Quaternion())).normalize();}
+function mirrorPoint(){return mirrorPortal.getWorldPosition(new THREE.Vector3());}
+function sideOfMirror(pw){mirrorPortal.updateMatrixWorld();return pw.clone().applyMatrix4(new THREE.Matrix4().copy(mirrorPortal.matrixWorld).invert());}
+const mirrorImage=model.clone(true);mirrorImage.matrixAutoUpdate=false;mirrorImage.visible=false;scene.add(mirrorImage);
+// görüntü yalnızca camın içinden görünsün: gözden camın dört kenarına uzanan düzlemler + aynanın arkası
+renderer.localClippingEnabled=true;
+const clipPlanes=[0,1,2,3,4].map(()=>new THREE.Plane());
+mirrorImage.traverse(o=>{if(o.material){o.material=o.material.clone();o.material.clippingPlanes=clipPlanes;}});
+function updateClip(eye){
+  mirrorPortal.updateMatrixWorld();const M=mirrorPortal.matrixWorld,cc=mirrorPoint(),n=mirrorNormal();
+  const C=[[-1,-1],[1,-1],[1,1],[-1,1]].map(([a,b])=>new THREE.Vector3(a*MW/2,b*MH/2,0).applyMatrix4(M));
+  for(let i=0;i<4;i++){const pl=clipPlanes[i].setFromCoplanarPoints(eye,C[i],C[(i+1)%4]);if(pl.distanceToPoint(cc.clone().addScaledVector(n,-0.05))<0)pl.negate();}
+  clipPlanes[4].setFromNormalAndCoplanarPoint(n.clone().negate(),cc);
+  return n.dot(eye.clone().sub(cc))>0;   // göz aynanın önünde mi?
+}
+function updateMirrorImage(){
+  if(!mirrorPortal.visible){mirrorImage.visible=false;return;}
+  rig.updateMatrixWorld(true);const c=new THREE.Vector3().setFromMatrixPosition(model.matrixWorld);
+  if(sideOfMirror(c).z<=0){mirrorImage.visible=false;return;}
+  const cam_=renderer.xr.isPresenting?renderer.xr.getCamera():camera;const eye=new THREE.Vector3().setFromMatrixPosition(cam_.matrixWorld);
+  if(!updateClip(eye)){mirrorImage.visible=false;return;}
+  mirrorImage.visible=true;mirrorImage.matrix.copy(reflAbout(mirrorNormal(),mirrorPoint())).multiply(model.matrixWorld);mirrorImage.matrixWorldNeedsUpdate=true;
+  model.children.forEach((a,i)=>{const b=mirrorImage.children[i];b.position.copy(a.position);b.quaternion.copy(a.quaternion);b.scale.copy(a.scale);b.visible=a.visible;});
+}
 
 function setCyl(m,p,q,r){const a=new THREE.Vector3(...p),b=new THREE.Vector3(...q),d=b.clone().sub(a),l=d.length();
   m.position.copy(a).add(b).multiplyScalar(.5);m.quaternion.setFromUnitVectors(YV,d.normalize());m.scale.set(r,Math.max(l,1e-4),r);}
@@ -266,11 +307,12 @@ world.add(infoPanel);
 /* ================= hamle düğmeleri (sol) ================= */
 const PX=1800; // düğme dokusunda metre başına piksel
 const btnPanel=new THREE.Group();world.add(btnPanel);
-const BW=0.6,BH=0.8;
+const BW=0.6,BH=0.92;
 const btnBg=canvasTex(Math.round(BW*PX),Math.round(BH*PX),(ctx,w,h)=>{ctx.clearRect(0,0,w,h);rr(ctx,4,4,w-8,h-8,24);ctx.fillStyle=COL.panel;ctx.fill();ctx.lineWidth=4;ctx.strokeStyle=COL.rule;ctx.stroke();
   const lab=(t,yM)=>{ctx.fillStyle=COL.muted;ctx.font=`600 34px ${FBODY}`;ctx.fillText(t,0.035*PX,(BH/2-yM)*PX);};
   ctx.fillStyle=COL.ink;ctx.font=`700 48px ${FBODY}`;ctx.fillText("Hamleler",0.035*PX,(BH/2-0.335)*PX);
-  lab("Bir köşeden tutup 120° çevir",0.255);lab("Karşılıklı iki ayrıttan tutup 180° çevir",0.115);lab("Aynada yansıt (kâğıtla yapılamaz)",-0.025);});
+  lab("Bir köşeden tutup 120° çevir",0.255);lab("Karşılıklı iki ayrıttan tutup 180° çevir",0.115);lab("Aynada yansıt (kâğıtla yapılamaz)",-0.025);
+  ctx.fillStyle=COL.muted;ctx.font=`400 30px ${FBODY}`;ctx.fillText("Gözlükte: dörtyüzlüyü tetik ya da yan tuşla tutun,",0.035*PX,(BH/2+0.395)*PX);ctx.fillText("çevirip yuvasına oturtun. Ayna için sağdaki aynadan geçirin.",0.035*PX,(BH/2+0.43)*PX);});
 const bgMesh=new THREE.Mesh(new THREE.PlaneGeometry(BW,BH),new THREE.MeshBasicMaterial({map:btnBg.tex,transparent:true}));btnPanel.add(bgMesh);
 const buttons=[];
 function makeBtn(label,x,y,w,h,action,opt={}){
@@ -294,10 +336,10 @@ function makeBtn(label,x,y,w,h,action,opt={}){
 /* ================= yerleşim ================= */
 function layout(xr){
   const portrait=!xr&&innerWidth/innerHeight<0.95;
-  if(portrait){btnPanel.position.set(0,0.62,-0.95);btnPanel.rotation.set(0,0,0);infoPanel.position.set(0,2.33,-0.95);infoPanel.rotation.set(0,0,0);
-    const v=(2.62/2)/Math.tan(THREE.MathUtils.degToRad(camera.fov/2))/0.74;controls.target.set(0,1.52,-0.95);camera.position.set(0,1.52,-0.95+v);}
-  else{btnPanel.position.set(-0.86,1.36,-0.84);btnPanel.rotation.set(0,0.55,0);infoPanel.position.set(0.88,1.42,-0.84);infoPanel.rotation.set(0,-0.55,0);
-    controls.target.set(0,1.38,-0.95);const half=1.32,need=half/Math.tan(THREE.MathUtils.degToRad(camera.fov/2))/camera.aspect;camera.position.set(0,1.5,-0.95+Math.max(1.9,need));}
+  if(portrait){btnPanel.position.set(0,0.56,-0.95);btnPanel.rotation.set(0,0,0);infoPanel.position.set(0,2.33,-0.95);infoPanel.rotation.set(0,0,0);
+    const v=(2.76/2)/Math.tan(THREE.MathUtils.degToRad(camera.fov/2))/0.74;controls.target.set(0,1.52,-0.95);camera.position.set(0,1.52,-0.95+v);}
+  else{btnPanel.position.set(-0.98,1.36,-0.8);btnPanel.rotation.set(0,0.55,0);infoPanel.position.set(1.04,1.42,-0.8);infoPanel.rotation.set(0,-0.55,0);
+    controls.target.set(0,1.38,-0.95);const half=1.45,need=half/Math.tan(THREE.MathUtils.degToRad(camera.fov/2))/camera.aspect;camera.position.set(0,1.5,-0.95+Math.max(1.9,need));}
   controls.update();
 }
 const controls=new OrbitControls(camera,renderer.domElement);controls.enableDamping=true;controls.minDistance=0.4;controls.maxDistance=7;
@@ -306,25 +348,29 @@ layout(false);
 /* ================= durum, animasyon ================= */
 const homeP=()=>{const o={};for(let k=1;k<=4;k++)o[k]=HOME[state[k]].slice();return o;};
 const ease=t=>t<.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2;
-function posAt(d,v,t){
+function posAt(d,v,t,k){
+  if(d.type==="lerp")return add(v,mul(sub(d.to[k],v),ease(t)));
   if(d.type==="rot")return mv(rotMat(d.u,d.ang*ease(t)),v);
   if(d.type==="mirror")return sub(v,mul(d.n,2*ease(t)*dot(v,d.n)));
   if(d.type==="roto"){if(t<.55)return mv(rotMat(d.u,d.ang*ease(t/.55)),v);const w=mv(rotMat(d.u,d.ang),v);return sub(w,mul(d.u,2*ease((t-.55)/.45)*dot(w,d.u)));}
   return v;}
 const overlayAt=(d,t)=>d.type==="rot"?{axis:d.u}:d.type==="mirror"?{plane:d.n}:d.type==="roto"?(t<.55?{axis:d.u}:{plane:d.u}):null;
-function duration(d){if(reduce)return 0;if(d.type==="rot")return Math.abs(d.ang)>Math.PI+.1?2300:(Math.abs(d.ang)>3?1800:1500);if(d.type==="mirror")return 1700;if(d.type==="roto")return 2900;return 0;}
+function duration(d){if(reduce)return 0;if(d.type==="rot")return Math.abs(d.ang)>Math.PI+.1?2300:(Math.abs(d.ang)>3?1800:1500);if(d.type==="mirror")return 1700;if(d.type==="roto")return 2900;if(d.type==="lerp")return 450;return 0;}
 function runMove(d,done){const P0={};for(let k=1;k<=4;k++)P0[k]=P[k].slice();const dur=duration(d);
   if(!dur){done();return;}anim={d,P0,t0:performance.now(),dur,done};}
 function finishAnimNow(){if(!anim)return;const cb=anim.done;anim=null;cb();}
 function settle(){P=homeP();drawModel(null);seen.add(sigKey(state));infoTex.redraw();}
 function setInfo(name,kind,rho,caption){info={name,kind,rho,caption};infoTex.redraw();}
 
-function tourGo(i){clearTimeout(tourTimer);clearTimeout(startTimer);anim=null;
+function tourGo(i){clearTimeout(tourTimer);clearTimeout(startTimer);anim=null;grab=null;floating=false;model.matrix.identity();model.matrixWorldNeedsUpdate=true;
   tourIdx=(i+24)%24;const g=TOUR[tourIdx];state=[0,1,2,3,4];P=homeP();drawModel(null);
   setInfo(g.name,g.kind,g.sig,`${tourIdx+1} / 24 · ${CAPTION[g.kind]}`);
   startTimer=setTimeout(()=>runMove(g.anim,()=>{state=g.sig.slice();settle();if(playing)tourTimer=setTimeout(()=>tourGo(tourIdx+1),reduce?2800:1800);}),reduce?0:350);}
 function toggleTour(){playing=!playing;tourBtn.userData.tex.redraw();clearTimeout(tourTimer);clearTimeout(startTimer);if(playing&&!anim)tourGo(tourIdx+1);}
+function returnToSocket(){model.matrix.identity();model.matrixWorldNeedsUpdate=true;floating=false;P=homeP();drawModel(null);}
 function manual(fn){ // elle hamle: turu durdurur, yarım kalan tur hamlesini bitirir
+  if(grab)return;
+  if(floating)returnToSocket();
   if(playing){playing=false;tourBtn.userData.tex.redraw();clearTimeout(tourTimer);clearTimeout(startTimer);}
   if(anim){if(anim.manual)return;finishAnimNow();}
   fn();}
@@ -339,6 +385,56 @@ function halfTurn(a,b){const m=add(HOME_INT[state[a]],HOME_INT[state[b]]),i=[0,1
 function mirror(a,b){const n=unit(sub(HOME[state[a]],HOME[state[b]])),M=[0,1,2].map(i=>[0,1,2].map(j=>(i===j?1:0)-2*n[i]*n[j]));
   applySpatial(M,{type:"mirror",n},`${a} ile ${b} köşelerini takas eden ayna`);}
 function resetHome(){state=[0,1,2,3,4];setInfo("Başlangıç","id",[0,1,2,3,4],"");settle();}
+
+/* ================= tutma: kumanda ya da elle al, çevir, yuvasına koy ================= */
+let grab=null,floating=false;
+const modelCenterWorld=()=>{rig.updateMatrixWorld(true);return new THREE.Vector3().setFromMatrixPosition(model.matrixWorld);};
+function modelLinear(){const e=model.matrix.elements;return [[e[0],e[4],e[8]],[e[1],e[5],e[9]],[e[2],e[6],e[10]]];}
+function startGrab(c,hitObj,viaSqueeze){
+  if(anim){if(anim.manual)return;finishAnimNow();}
+  if(playing){playing=false;tourBtn.userData.tex.redraw();clearTimeout(tourTimer);clearTimeout(startTimer);}
+  rig.updateMatrixWorld(true);c.updateMatrixWorld(true);
+  grab={ctrl:c,hit:hitObj,moved:!!viaSqueeze,offset:new THREE.Matrix4().copy(c.matrixWorld).invert().multiply(model.matrixWorld),
+        p0:new THREE.Vector3().setFromMatrixPosition(c.matrixWorld),q0:new THREE.Quaternion().setFromRotationMatrix(c.matrixWorld),lastZ:null};
+}
+function updateGrab(){
+  const c=grab.ctrl;c.updateMatrixWorld(true);
+  if(!grab.moved){const p=new THREE.Vector3().setFromMatrixPosition(c.matrixWorld),q=new THREE.Quaternion().setFromRotationMatrix(c.matrixWorld);
+    if(p.distanceTo(grab.p0)>0.02*world.scale.x||q.angleTo(grab.q0)>0.12)grab.moved=true;else return;}
+  const W=new THREE.Matrix4().copy(c.matrixWorld).multiply(grab.offset);   // modelin istenen dünya matrisi
+  if(mirrorPortal.visible){
+    const cen=new THREE.Vector3().setFromMatrixPosition(W),loc=sideOfMirror(cen);
+    if(grab.lastZ!==null&&Math.sign(loc.z)!==Math.sign(grab.lastZ)&&Math.abs(loc.x)<MW/2+0.03&&Math.abs(loc.y)<MH/2+0.03){
+      // aynadan geçti: kendi merkezinden aynaya paralel düzleme göre yansır (el değiştirir), yoluna devam eder
+      const Rf=reflAbout(mirrorNormal(),cen);
+      W.premultiply(Rf);
+      grab.offset.copy(new THREE.Matrix4().copy(c.matrixWorld).invert().multiply(W));
+      mirrorFlash=performance.now();
+      setInfo(det3(linOf(new THREE.Matrix4().copy(rig.matrixWorld).invert().multiply(W)))<0?"Aynadan geçti: artık ayna görüntüsü":"Aynadan geri geçti: yeniden asıl hâli",info.kind,info.rho,"Çevirip yuvasına oturtun.");
+    }
+    grab.lastZ=loc.z;
+  }
+  model.matrix.copy(new THREE.Matrix4().copy(rig.matrixWorld).invert().multiply(W));model.matrixWorldNeedsUpdate=true;
+}
+function linOf(m){const e=m.elements;return [[e[0],e[4],e[8]],[e[1],e[5],e[9]],[e[2],e[6],e[10]]];}
+function endGrab(){
+  const g_=grab;grab=null;if(!g_)return;
+  if(!g_.moved){if(g_.hit&&g_.hit.userData.type!=="body")activate(g_.hit);return;}   // kısa basış: eski hamle
+  const e=model.matrix.elements;
+  if(Math.hypot(e[12],e[13],e[14])<0.9)snapToSocket();   // yuvaya ~22 cm'den yakın: otur
+  else{floating=true;setInfo("Dörtyüzlü yuvanın dışında",info.kind,info.rho,"Yerine koymak için yeniden tutup yuvaya yaklaştırın."+(det3(modelLinear())<0?" Şu an ayna görüntüsü.":""));}
+}
+function snapToSocket(){
+  const L=modelLinear(),d=det3(L)>0?1:-1,e=model.matrix.elements,T=[e[12],e[13],e[14]];
+  let best=null,bd=Infinity;
+  for(const g of GROUP){if(g.det!==d)continue;let q=0;for(let i=0;i<3;i++)for(let j=0;j<3;j++)q+=(L[i][j]-g.M[i][j])**2;if(q<bd){bd=q;best=g;}}
+  const Q={};for(let k=1;k<=4;k++)Q[k]=add(mv(L,P[k]),T);           // köşelerin şu anki yeri (yuva koordinatlarında)
+  model.matrix.identity();model.matrixWorldNeedsUpdate=true;floating=false;P=Q;drawModel(null);
+  const inv=[0];for(let k=1;k<=4;k++)inv[state[k]]=k;
+  const rho=[0],ns=[0],to={};for(let k=1;k<=4;k++){rho[k]=inv[best.sig[state[k]]];ns[k]=best.sig[state[k]];to[k]=HOME[ns[k]].slice();}
+  setInfo(d<0?"Aynadan geçirip yuvasına oturttunuz":"Elle çevirip yuvasına oturttunuz",best.kind,rho,"");
+  runMove({type:"lerp",to},()=>{state=ns;settle();});if(anim)anim.manual=true;
+}
 
 /* ================= seçme: fare, dokunma, kumanda, el ================= */
 const ray=new THREE.Raycaster(),tmpM=new THREE.Matrix4();
@@ -360,8 +456,22 @@ const controllers=[],modelFactory=new XRControllerModelFactory();
 const rayLineGeo=new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0,0,0),new THREE.Vector3(0,0,-1)]);
 for(let i=0;i<2;i++){const c=renderer.xr.getController(i);
   const line=new THREE.Line(rayLineGeo,new THREE.LineBasicMaterial({color:COL.guide,transparent:true,opacity:.85}));line.scale.z=2.5;c.add(line);c.userData.line=line;
-  c.addEventListener("select",()=>{rayFromController(c);const h=hitFromRay();if(h)activate(h.object);});
-  c.addEventListener("connected",ev=>{c.userData.hand=!!ev.data.hand;});
+  c.addEventListener("connected",ev=>{c.userData.tracked=!!(ev.data&&ev.data.targetRayMode==="tracked-pointer");});
+  c.addEventListener("disconnected",()=>{if(grab&&grab.ctrl===c)endGrab();c.userData.tracked=false;});
+  // telefonda AR (ekrana dokunma): dokun ve seç
+  c.addEventListener("select",()=>{if(c.userData.tracked)return;rayFromController(c);const h=hitFromRay();if(h)activate(h.object);});
+  // kumanda ya da el: köşe/ayrıt/gövdeye basılı tut = tut; kısa bas = seç; düğmeler bırakınca çalışır
+  c.addEventListener("selectstart",()=>{if(!c.userData.tracked||grab)return;rayFromController(c);let h=hitFromRay();
+    if(!h){const hb=ray.intersectObject(faceMesh,false);if(hb.length)h=hb[0];}
+    if(h&&h.object.userData.type!=="btn")startGrab(c,h.object,false);else c.userData.pressHit=h?h.object:null;});
+  c.addEventListener("selectend",()=>{if(!c.userData.tracked)return;
+    if(grab&&grab.ctrl===c){endGrab();return;}
+    const ph=c.userData.pressHit;c.userData.pressHit=null;if(ph){rayFromController(c);const h=hitFromRay();if(h&&h.object===ph)activate(ph);}});
+  c.addEventListener("squeezestart",()=>{if(!c.userData.tracked||grab)return;rayFromController(c);const h=hitFromRay();
+    const near=new THREE.Vector3().setFromMatrixPosition(c.matrixWorld).distanceTo(modelCenterWorld())<0.3*world.scale.x;
+    const hb=ray.intersectObject(faceMesh,false).length>0;
+    if((h&&h.object.userData.type!=="btn")||hb||near)startGrab(c,null,true);});
+  c.addEventListener("squeezeend",()=>{if(grab&&grab.ctrl===c)endGrab();});
   scene.add(c);controllers.push(c);
   try{const grip=renderer.xr.getControllerGrip(i);grip.add(modelFactory.createControllerModel(grip));scene.add(grip);}catch(_){}
 }
@@ -398,8 +508,8 @@ async function startXR(mode){
     else resetWorld();
     renderer.xr.setReferenceSpaceType(space);
     await renderer.xr.setSession(session);
-    controls.enabled=false;layout(true);
-    session.addEventListener("end",()=>{xrMode=null;scene.background=BG;floor.visible=true;resetWorld();xrOverlay.hidden=true;controls.enabled=true;layout(false);});
+    controls.enabled=false;layout(true);mirrorPortal.visible=!phoneAR;
+    session.addEventListener("end",()=>{mirrorPortal.visible=false;grab=null;if(floating)returnToSocket();xrMode=null;scene.background=BG;floor.visible=true;resetWorld();xrOverlay.hidden=true;controls.enabled=true;layout(false);});
   }catch(err){
     msg.textContent="Oturum başlatılamadı: "+(err&&err.message?err.message:err);
     scene.background=BG;floor.visible=true;resetWorld();xrOverlay.hidden=true;
@@ -413,8 +523,11 @@ checkXR();
 /* ================= döngü ================= */
 addEventListener("resize",()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);if(!renderer.xr.isPresenting)layout(false);});
 renderer.setAnimationLoop(now=>{
-  if(anim){const t=Math.min(1,(performance.now()-anim.t0)/anim.dur);for(let k=1;k<=4;k++)P[k]=posAt(anim.d,anim.P0[k],t);drawModel(overlayAt(anim.d,t));
+  if(anim){const t=Math.min(1,(performance.now()-anim.t0)/anim.dur);for(let k=1;k<=4;k++)P[k]=posAt(anim.d,anim.P0[k],t,k);drawModel(overlayAt(anim.d,t));
     if(t>=1){const cb=anim.done;anim=null;cb();}}
+  if(grab)updateGrab();
+  updateMirrorImage();
+  frameMat.emissive.setHex(performance.now()-mirrorFlash<350?0x6f8fb0:0x000000);
   if(renderer.xr.isPresenting){const hv=[];
     for(const c of controllers){rayFromController(c);const h=hitFromRay();c.userData.line.scale.z=h?h.distance:2.5;if(h)hv.push(h.object);}
     if(idKey(hv)!==idKey([...hovered]))setHover(hv);}
@@ -430,7 +543,13 @@ if(reduce){playing=false;tourBtn.userData.tex.redraw();setInfo(TOUR[0].name,"id"
 /* test için */
 window.__vr={state:()=>state.slice(),seen:()=>seen.size,info:()=>info,playing:()=>playing,
   screenOf:(m)=>{const v=new THREE.Vector3();m.getWorldPosition(v);v.project(camera);return [(v.x+1)/2*innerWidth,(1-v.y)/2*innerHeight];},
-  buttons,vertObjs};
+  buttons,vertObjs,
+  grabTest:{ctrl:(()=>{const o=new THREE.Object3D();scene.add(o);return o;})(),
+    showMirror:v=>{mirrorPortal.visible=v;},
+    setCtrl(pos,quat){this.ctrl.position.set(...pos);this.ctrl.quaternion.set(...quat);this.ctrl.updateMatrixWorld(true);},
+    start(){startGrab(this.ctrl,null,true);},step(){if(grab)updateGrab();},end(){endGrab();},
+    modelCenter:()=>modelCenterWorld().toArray(),mirrorWorld:()=>({p:mirrorPoint().toArray(),n:mirrorNormal().toArray()}),
+    det:()=>det3(modelLinear()),floating:()=>floating,mirrorImageVisible:()=>(updateMirrorImage(),mirrorImage.visible)}};
 </script>
 </body>
 </html>
