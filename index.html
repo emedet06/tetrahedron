@@ -17,6 +17,7 @@
   --y1:#CF4318; --y2:#2259BE; --y3:#9C6E00;
   --y1-soft:#FAE2D9; --y2-soft:#DEE7F8; --y3-soft:#F3E8CB;
   --guide:#5A7DA3; --focus:#2259BE;
+  --socket:#7E91A6; --socket-fill:#E2E9F1;
   --display:"Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
   --body:"IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --math:"STIX Two Text", "Cambria Math", Cambria, "Times New Roman", serif;
@@ -27,7 +28,7 @@
     --face:#2A3834; --soft:#29372F; --strong:#E5EDE9; --on-strong:#18221F;
     --y1:#FF8160; --y2:#8AB0FF; --y3:#EDC456;
     --y1-soft:#4B2C23; --y2-soft:#283653; --y3-soft:#463B1F;
-    --guide:#A3BDD8; --focus:#8AB0FF; color-scheme:dark;
+    --guide:#A3BDD8; --focus:#8AB0FF; --socket:#7C918B; --socket-fill:#22302C; color-scheme:dark;
   }
 }
 :root[data-theme="dark"]{
@@ -35,7 +36,7 @@
   --face:#2A3834; --soft:#29372F; --strong:#E5EDE9; --on-strong:#18221F;
   --y1:#FF8160; --y2:#8AB0FF; --y3:#EDC456;
   --y1-soft:#4B2C23; --y2-soft:#283653; --y3-soft:#463B1F;
-  --guide:#A3BDD8; --focus:#8AB0FF; color-scheme:dark;
+  --guide:#A3BDD8; --focus:#8AB0FF; --socket:#7C918B; --socket-fill:#22302C; color-scheme:dark;
 }
 *{box-sizing:border-box}
 body{margin:0}
@@ -62,6 +63,8 @@ h1 .n{color:var(--y2)}
 .legend{display:grid; gap:6px; margin:4px 0 0; padding:0; list-style:none}
 .legend li{display:flex; align-items:center; gap:10px; flex-wrap:wrap}
 .legend .what{color:var(--muted); font-size:.9rem}
+.legend li.sock{flex-wrap:nowrap; align-items:flex-start; max-width:64ch}
+.legend li.sock .what{flex:1 1 0; min-width:0}
 
 .lab{display:grid; grid-template-columns:minmax(0,1.08fr) minmax(0,.92fr); gap:20px; align-items:start}
 @media (max-width:860px){ .lab{grid-template-columns:minmax(0,1fr)} }
@@ -72,7 +75,7 @@ h1 .n{color:var(--y2)}
 .tab[aria-selected="true"]{color:var(--ink); border-bottom-color:var(--ink)}
 .tab:focus-visible{outline:2px solid var(--focus); outline-offset:-4px}
 .stagebox{position:relative; padding:6px 10px 0}
-#stage{display:block; width:100%; max-width:540px; aspect-ratio:2.84/2.72; margin:0 auto; touch-action:none; cursor:grab; user-select:none; -webkit-user-select:none; transition:opacity .16s ease}
+#stage{display:block; width:100%; max-width:560px; aspect-ratio:3.04/2.96; margin:0 auto; touch-action:none; cursor:grab; user-select:none; -webkit-user-select:none; transition:opacity .16s ease}
 #stage.dim{opacity:.15}
 #stage.dragging{cursor:grabbing}
 #stage text{font-family:var(--math)}
@@ -106,6 +109,11 @@ h1 .n{color:var(--y2)}
 .yrow .arr{color:var(--muted)}
 .yrow b{font-family:var(--math); font-weight:600}
 .summary{font-weight:600}
+.tag{display:inline-flex; align-items:center; justify-content:center; min-width:1.7em; height:1.7em; border:1.5px solid var(--socket); border-radius:3px; background:var(--card); color:var(--muted); font-family:var(--body); font-weight:600; font-size:.82rem}
+.vk{display:inline-flex; align-items:center; justify-content:center; width:1.8em; height:1.8em; border:2px solid var(--ink); border-radius:50%; background:var(--card); font-family:var(--math); font-weight:600}
+.tworow{display:grid; grid-template-columns:auto repeat(4, 2.3em); gap:6px 8px; align-items:center; justify-items:center}
+.tworow .rl{justify-self:start; font-size:.85rem; color:var(--muted); padding-right:4px}
+.tworow .tag.moved{border-color:var(--ink); color:var(--ink)}
 
 .section{display:grid; gap:14px}
 .section > p{margin:0; max-width:70ch}
@@ -146,6 +154,7 @@ footer{font-size:.86rem; color:var(--muted); border-top:1px solid var(--rule); p
       <li><span class="dot c0"></span><span class="m"><i>y</i><sub>1</sub> = <i>x</i><sub>1</sub><i>x</i><sub>2</sub> + <i>x</i><sub>3</sub><i>x</i><sub>4</sub></span><span class="what">12 ve 34 ayrıtları</span></li>
       <li><span class="dot c1"></span><span class="m"><i>y</i><sub>2</sub> = <i>x</i><sub>1</sub><i>x</i><sub>3</sub> + <i>x</i><sub>2</sub><i>x</i><sub>4</sub></span><span class="what">13 ve 24 ayrıtları</span></li>
       <li><span class="dot c2"></span><span class="m"><i>y</i><sub>3</sub> = <i>x</i><sub>1</sub><i>x</i><sub>4</sub> + <i>x</i><sub>2</sub><i>x</i><sub>3</sub></span><span class="what">14 ve 23 ayrıtları</span></li>
+      <li class="sock"><span class="tag">1</span><span class="what">Arkadaki soluk kalıp dörtyüzlünün <b>yuvası</b>: başlangıçtaki yeri, köşeli etiketlerde başlangıç numaraları, ince çizgilerde başlangıç renkleri. Her simetriden sonra dörtyüzlü yine bu yuvaya oturur; yuvadaki numaralarla karşılaştırınca hangi köşenin nereye gittiğini görürsünüz.</span></li>
     </ul>
   </header>
 
@@ -156,7 +165,7 @@ footer{font-size:.86rem; color:var(--muted); border-top:1px solid var(--rule); p
         <button class="tab" id="tab-try" role="tab" aria-selected="false">Kendin dene</button>
       </div>
       <div class="stagebox">
-        <svg id="stage" viewBox="-1.42 -1.36 2.84 2.72" role="img" aria-label="Köşeleri numaralı, karşılıklı ayrıtları aynı renge boyanmış düzgün dörtyüzlü"><g id="scene"></g></svg>
+        <svg id="stage" viewBox="-1.52 -1.48 3.04 2.96" role="img" aria-label="Köşeleri numaralı, karşılıklı ayrıtları aynı renge boyanmış düzgün dörtyüzlü"><g id="scene"></g></svg>
       </div>
       <div class="caption" id="caption" aria-live="polite"></div>
 
@@ -199,6 +208,8 @@ footer{font-size:.86rem; color:var(--muted); border-top:1px solid var(--rule); p
       <div class="kicker">Kökleri yer değiştirince y'ler</div>
       <ul class="ylist" id="ylist"></ul>
       <div class="summary" id="ysum"></div>
+      <div class="kicker">Yuvaya göre</div>
+      <div class="tworow" id="tworow" aria-label="Her köşenin şu an hangi yuvada durduğu"></div>
       <p class="small" id="total"></p>
     </aside>
   </div>
@@ -350,6 +361,10 @@ const svg=document.getElementById("scene"), stage=document.getElementById("stage
 const cam=v=>mv(C,v);
 const proj=c=>{const k=F/(F-c[2]);return [c[0]*k,-c[1]*k,k];};
 const f3=x=>x.toFixed(3);
+function convexHull(pts){const P_=pts.map(p=>[p[0],p[1]]).sort((a,b)=>a[0]-b[0]||a[1]-b[1]);const cr=(o,a,b)=>(a[0]-o[0])*(b[1]-o[1])-(a[1]-o[1])*(b[0]-o[0]);
+  const lo=[],up=[];for(const p of P_){while(lo.length>=2&&cr(lo[lo.length-2],lo[lo.length-1],p)<=0)lo.pop();lo.push(p);}
+  for(const p of P_.slice().reverse()){while(up.length>=2&&cr(up[up.length-2],up[up.length-1],p)<=0)up.pop();up.push(p);}
+  return lo.slice(0,-1).concat(up.slice(0,-1));}
 function render(overlay){
   const cp={},pp={};
   for(let k=1;k<=4;k++){cp[k]=cam(P[k]);pp[k]=proj(cp[k]);}
@@ -360,6 +375,18 @@ function render(overlay){
   faces.sort((a,b)=>a.z-b.z);
   const edgeFront=(a,b)=>faces.some(F_=>F_.front&&F_.f.includes(a)&&F_.f.includes(b));
   let h="";
+  // yuva: başlangıçtaki yer, sabit; biraz büyük ve soluk
+  {const SS=1.1,sc={},sp={};for(let k=1;k<=4;k++){sc[k]=cam(mul(HOME[k],SS));sp[k]=proj(sc[k]);}
+   const hull=convexHull([1,2,3,4].map(k=>sp[k]));
+   h+=`<polygon points="${hull.map(q=>f3(q[0])+","+f3(q[1])).join(" ")}" fill="var(--socket-fill)" stroke="var(--socket)" stroke-width="1" stroke-opacity=".5" vector-effect="non-scaling-stroke"/>`;
+   const sf=FACES.map(f=>{const a=sc[f[0]],b=sc[f[1]],c=sc[f[2]];let n=cross(sub(b,a),sub(c,a));const cen=mul(add(add(a,b),c),1/3);if(dot(n,cen)<0)n=mul(n,-1);return {f,front:dot(n,sub(eye,cen))>0};});
+   for(const [a,b] of EDGES){const fr=sf.some(q=>q.front&&q.f.includes(a)&&q.f.includes(b));
+     h+=`<line x1="${f3(sp[a][0])}" y1="${f3(sp[a][1])}" x2="${f3(sp[b][0])}" y2="${f3(sp[b][1])}" stroke="var(--y${edgePair(a,b)+1})" stroke-width="1.5" ${fr?"":'stroke-dasharray="3 4"'} opacity="${fr?0.8:0.5}" stroke-linecap="round" vector-effect="non-scaling-stroke"/>`;}
+   for(let k=1;k<=4;k++){const a=proj(cam(mul(HOME[k],1.13))),b=proj(cam(mul(HOME[k],1.23))),t=proj(cam(mul(HOME[k],1.31))),r=0.07*t[2];
+     h+=`<line x1="${f3(a[0])}" y1="${f3(a[1])}" x2="${f3(b[0])}" y2="${f3(b[1])}" stroke="var(--socket)" stroke-width="1.2" vector-effect="non-scaling-stroke"/>`+
+        `<rect x="${f3(t[0]-r)}" y="${f3(t[1]-r)}" width="${f3(2*r)}" height="${f3(2*r)}" rx="${f3(r*0.25)}" fill="var(--card)" stroke="var(--socket)" stroke-width="1.5" vector-effect="non-scaling-stroke"/>`+
+        `<text x="${f3(t[0])}" y="${f3(t[1])}" font-size="${f3(0.095*t[2])}" text-anchor="middle" dominant-baseline="central" fill="var(--muted)" font-weight="600" style="font-family:var(--body)" pointer-events="none">${k}</text>`;}
+  }
   const line=(a,b,cls,extra="")=>`<line x1="${f3(pp[a][0])}" y1="${f3(pp[a][1])}" x2="${f3(pp[b][0])}" y2="${f3(pp[b][1])}" class="${cls}" ${extra}/>`;
   const col=j=>`var(--y${j+1})`;
   // arka ayrıtlar
@@ -443,7 +470,9 @@ function showMove(name,kind,rho){
 }
 function showTotal(){
   const g=findBySig(state);
-  $("total").innerHTML=mode==="try"?`Başlangıca göre toplam duruş: <span class="m">${g.cyc}</span> (${KIND_LABEL[g.kind]}). Tabloda çerçeveli.`:"";
+  $("tworow").innerHTML=`<span class="rl">Köşe</span>`+[1,2,3,4].map(k=>`<span class="vk">${k}</span>`).join("")+
+    `<span class="rl">Yuvası</span>`+[1,2,3,4].map(k=>`<span class="tag${state[k]!==k?" moved":""}">${state[k]}</span>`).join("");
+  $("total").innerHTML=`Başlangıca göre: <span class="m">${g.cyc}</span> (${KIND_LABEL[g.kind]}, tabloda çerçeveli). ${tauText(inducedTau(state))}`;
 }
 const COL_ORDER=[[0,1,2],[1,2,0],[2,0,1],[0,2,1],[2,1,0],[1,0,2]];
 const COL_SUB=["V₄: çiftler yerinde","dönmeler","dönmeler","ayna gerekir","ayna gerekir","ayna gerekir"];
@@ -465,7 +494,7 @@ function tourGo(i){
   clearTimeout(tourTimer);clearTimeout(startTimer);anim=null;
   tourIdx=(i+24)%24;const g=TOUR[tourIdx];
   if(sigKey(state)!=="1234"){flash();}
-  state=[0,1,2,3,4];P=homeP();render(null);refreshGrid();
+  state=[0,1,2,3,4];P=homeP();render(null);refreshGrid();showTotal();
   $("stepnum").textContent=`${tourIdx+1} / 24`;
   $("caption").textContent=GROUP_CAPTION[g.kind];
   showMove(g.name,g.kind,g.sig);
@@ -533,7 +562,7 @@ window.__dortyuzlu={GROUP,TOUR,inducedTau,cycleStr};
 /* ---------- başlat ---------- */
 initCamera();buildGrid();
 if(reduce){playing=false;$("play").textContent="Oynat";}
-P=homeP();render(null);seen.add("1234");refreshGrid();
+P=homeP();render(null);seen.add("1234");refreshGrid();showTotal();
 tourIdx=0;
 if(playing)tourGo(0);else{$("caption").textContent=GROUP_CAPTION.id;showMove(TOUR[0].name,"id",TOUR[0].sig);$("stepnum").textContent="1 / 24";}
 })();

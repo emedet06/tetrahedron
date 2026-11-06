@@ -22,6 +22,8 @@
   .help{position:fixed; left:0; right:0; bottom:0; z-index:5; margin:0; padding:10px max(14px, env(safe-area-inset-left,0px)) calc(10px + env(safe-area-inset-bottom,0px)); font-size:.86rem; color:var(--muted); background:var(--bar); border-top:1px solid var(--rule)}
   #msg{font-size:.84rem; color:var(--muted); flex-basis:100%}
   [hidden]{display:none!important}
+  #xr-overlay{position:fixed; top:0; left:0; right:0; display:flex; gap:10px; align-items:center; flex-wrap:wrap; padding:calc(10px + env(safe-area-inset-top,0px)) 14px 10px; color:#fff; font-size:.86rem; text-shadow:0 1px 3px rgba(0,0,0,.8)}
+  #xr-overlay button{font:600 .9rem inherit; font-family:inherit; color:var(--bg); background:var(--ink); border:0; border-radius:3px; padding:8px 12px}
   @media (max-width:600px){ .bar strong{font-size:.95rem} .bar button,.bar a{padding:5px 10px; font-size:.85rem} #msg{font-size:.76rem} .help{font-size:.76rem; padding-top:7px} }
 </style>
 </head>
@@ -33,6 +35,7 @@
   <a href="./">2B sayfa</a>
   <span id="msg"></span>
 </div>
+<div id="xr-overlay" hidden><button id="xr-exit">AR'dan çık</button><span>Bir köşeye, ayrıta ya da düğmeye dokunun. Paneller iki yanda; telefonu çevirerek bakın.</span></div>
 <p class="help" id="help">Sürükleyerek etrafında dönün, iki parmakla ya da tekerlekle yaklaşın. Bir köşeye, bir ayrıta ya da hamle düğmelerine dokunun.</p>
 
 <script type="importmap">
@@ -175,6 +178,18 @@ const axisLine=new THREE.Line(axisGeo,new THREE.LineDashedMaterial({color:COL.gu
 const mirrorMesh=new THREE.Mesh(new THREE.PlaneGeometry(2.5,2.5),new THREE.MeshBasicMaterial({color:COL.guide,transparent:true,opacity:.16,side:THREE.DoubleSide,depthWrite:false}));
 mirrorMesh.visible=false;rig.add(mirrorMesh);
 const ZV=new THREE.Vector3(0,0,1),YV=new THREE.Vector3(0,1,0);
+/* yuva: başlangıçtaki yer; sabit, biraz büyük ve soluk */
+const SOCK=1.1;
+{const g=new THREE.BufferGeometry();const arr=[];for(const f of FACES)for(const k of f)arr.push(...mul(HOME[k],SOCK));
+ g.setAttribute("position",new THREE.Float32BufferAttribute(arr,3));
+ rig.add(new THREE.Mesh(g,new THREE.MeshBasicMaterial({color:COL.muted,transparent:true,opacity:.08,side:THREE.DoubleSide,depthWrite:false})));
+ const sm=COL.y.map(c=>new THREE.MeshBasicMaterial({color:c,transparent:true,opacity:.55}));
+ for(const [a,b] of EDGES){const m=new THREE.Mesh(cylGeo,sm[edgePair(a,b)]);setCyl(m,mul(HOME[a],SOCK),mul(HOME[b],SOCK),0.013);rig.add(m);}
+ const lm=new THREE.LineBasicMaterial({color:COL.muted});
+ for(let k=1;k<=4;k++)rig.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(...mul(HOME[k],1.13)),new THREE.Vector3(...mul(HOME[k],1.25))]),lm));}
+const sockTags=[1,2,3,4].map(k=>{const t=canvasTex(128,128,(ctx,w,h)=>{ctx.clearRect(0,0,w,h);rr(ctx,10,10,108,108,18);ctx.fillStyle=COL.panel;ctx.fill();ctx.lineWidth=7;ctx.strokeStyle=COL.muted;ctx.stroke();
+    ctx.fillStyle=COL.muted;ctx.font=`600 66px ${FBODY}`;ctx.textAlign="center";ctx.textBaseline="middle";ctx.fillText(String(k),64,68);});
+  const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:t.tex,depthTest:false,transparent:true}));sp.renderOrder=15;sp.scale.setScalar(0.17);sp.position.set(...mul(HOME[k],1.33));rig.add(sp);return t;});
 
 function setCyl(m,p,q,r){const a=new THREE.Vector3(...p),b=new THREE.Vector3(...q),d=b.clone().sub(a),l=d.length();
   m.position.copy(a).add(b).multiplyScalar(.5);m.quaternion.setFromUnitVectors(YV,d.normalize());m.scale.set(r,Math.max(l,1e-4),r);}
@@ -196,7 +211,7 @@ let info={name:"Başlangıç",caption:CAPTION.id,kind:"id",rho:[0,1,2,3,4]};
 const seen=new Set(["1234"]);
 function wrap(ctx,text,maxW){const words=text.split(" ");const lines=[];let cur="";
   for(const w of words){const t=cur?cur+" "+w:w;if(ctx.measureText(t).width>maxW&&cur){lines.push(cur);cur=w;}else cur=t;}if(cur)lines.push(cur);return lines;}
-const IW=1024,IH=1360;
+const IW=1024,IH=1540;
 const infoTex=canvasTex(IW,IH,(ctx,w,h)=>{
   ctx.clearRect(0,0,w,h);rr(ctx,4,4,w-8,h-8,22);ctx.fillStyle=COL.panel;ctx.fill();ctx.lineWidth=4;ctx.strokeStyle=COL.rule;ctx.stroke();
   const L=52,W=w-2*L;let y=78;
@@ -215,7 +230,19 @@ const infoTex=canvasTex(IW,IH,(ctx,w,h)=>{
     const s1=`${Y(j)} = ${X(a)}${X(b)} + ${X(c)}${X(d)}   →   ${X(rho[a])}${X(rho[b])} + ${X(rho[c])}${X(rho[d])}  =  `;
     const s1w=fillRich(ctx,s1,L+58,y+45);ctx.font=`italic 600 38px ${FMATH}`;ctx.fillStyle=COL.y[t[j]];ctx.fillText(Y(t[j]),L+58+s1w,y+45);
     y+=78;}
-  ctx.fillStyle=COL.ink;ctx.font=`600 30px ${FBODY}`;fillRich(ctx,tauText(t),L,y+24);y+=86;
+  ctx.fillStyle=COL.ink;ctx.font=`600 30px ${FBODY}`;fillRich(ctx,tauText(t),L,y+24);y+=80;
+  // yuvaya göre: her köşe şimdi hangi yuvada
+  ctx.fillStyle=COL.muted;ctx.font=`600 24px ${FBODY}`;ctx.fillText("YUVAYA GÖRE (BAŞLANGIÇLA KARŞILAŞTIRIN)",L,y);y+=22;
+  {const cell=80,x0=L+150;ctx.font=`400 26px ${FBODY}`;ctx.fillStyle=COL.muted;ctx.fillText("Köşe",L,y+46);ctx.fillText("Yuvası",L,y+46+cell);
+   for(let k=1;k<=4;k++){const cx=x0+(k-1)*cell+cell/2,moved=state[k]!==k;
+     ctx.beginPath();ctx.arc(cx,y+37,27,0,7);ctx.fillStyle=COL.disc;ctx.fill();ctx.lineWidth=4;ctx.strokeStyle=COL.discInk;ctx.stroke();
+     ctx.fillStyle=COL.discInk;ctx.font=`600 32px ${FMATH}`;ctx.textAlign="center";ctx.fillText(String(k),cx,y+48);
+     rr(ctx,cx-27,y+cell+10,54,54,9);ctx.fillStyle=COL.panel;ctx.fill();ctx.lineWidth=4;ctx.strokeStyle=moved?COL.ink:COL.muted;ctx.stroke();
+     ctx.fillStyle=moved?COL.ink:COL.muted;ctx.font=`600 30px ${FBODY}`;ctx.fillText(String(state[k]),cx,y+cell+48);ctx.textAlign="left";}
+   y+=2*cell+34;}
+  {const gc=findBySig(state);ctx.fillStyle=COL.muted;ctx.font=`400 26px ${FBODY}`;
+   for(const ln of wrap(ctx,`Başlangıca göre: ${gc.cyc} (${KIND[gc.kind]}). ${tauText(inducedTau(state))}`,W)){fillRich(ctx,ln,L,y);y+=34;}}
+  y+=46;
   // 24'lük tablo
   ctx.strokeStyle=COL.rule;ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(L,y-24);ctx.lineTo(w-L,y-24);ctx.stroke();
   ctx.fillStyle=COL.muted;ctx.font=`600 24px ${FBODY}`;ctx.fillText(`24 SİMETRİ · ${seen.size} / 24 GÖRÜLDÜ`,L,y+10);y+=34;
@@ -267,8 +294,8 @@ function makeBtn(label,x,y,w,h,action,opt={}){
 /* ================= yerleşim ================= */
 function layout(xr){
   const portrait=!xr&&innerWidth/innerHeight<0.95;
-  if(portrait){btnPanel.position.set(0,0.7,-0.95);btnPanel.rotation.set(0,0,0);infoPanel.position.set(0,2.2,-0.95);infoPanel.rotation.set(0,0,0);
-    const v=(2.35/2)/Math.tan(THREE.MathUtils.degToRad(camera.fov/2))/0.74;controls.target.set(0,1.52,-0.95);camera.position.set(0,1.52,-0.95+v);}
+  if(portrait){btnPanel.position.set(0,0.62,-0.95);btnPanel.rotation.set(0,0,0);infoPanel.position.set(0,2.33,-0.95);infoPanel.rotation.set(0,0,0);
+    const v=(2.62/2)/Math.tan(THREE.MathUtils.degToRad(camera.fov/2))/0.74;controls.target.set(0,1.52,-0.95);camera.position.set(0,1.52,-0.95+v);}
   else{btnPanel.position.set(-0.86,1.36,-0.84);btnPanel.rotation.set(0,0.55,0);infoPanel.position.set(0.88,1.42,-0.84);infoPanel.rotation.set(0,-0.55,0);
     controls.target.set(0,1.38,-0.95);const half=1.32,need=half/Math.tan(THREE.MathUtils.degToRad(camera.fov/2))/camera.aspect;camera.position.set(0,1.5,-0.95+Math.max(1.9,need));}
   controls.update();
@@ -343,22 +370,41 @@ function rayFromController(c){tmpM.identity().extractRotation(c.matrixWorld);ray
 /* ================= XR oturumu ================= */
 const msg=document.getElementById("msg"),bVR=document.getElementById("btn-vr"),bAR=document.getElementById("btn-ar");
 async function checkXR(){
-  if(!("xr" in navigator)){msg.textContent="Bu tarayıcı WebXR desteklemiyor; sahneyi burada 3B olarak inceleyebilirsiniz. VR için Meta Quest tarayıcısıyla açın.";return;}
+  if(!("xr" in navigator)){const ios=/iPhone|iPad|iPod/.test(navigator.userAgent)||(navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1);
+    msg.textContent=ios?"iPhone ve iPad'de tarayıcılar WebXR'ı (VR/AR) desteklemiyor; sahneyi burada 3B olarak inceleyebilirsiniz.":"Bu tarayıcı WebXR desteklemiyor; sahneyi burada 3B olarak inceleyebilirsiniz. VR için Meta Quest tarayıcısıyla açın.";return;}
   try{if(await navigator.xr.isSessionSupported("immersive-vr"))bVR.hidden=false;}catch(_){}
   try{if(await navigator.xr.isSessionSupported("immersive-ar"))bAR.hidden=false;}catch(_){}
   if(bVR.hidden&&bAR.hidden)msg.textContent="Bu cihazda VR/AR oturumu açılamıyor; sahneyi burada 3B olarak inceleyebilirsiniz.";
 }
 let xrMode=null;
+const isHeadset=/OculusBrowser|Quest|Pico|Wolvic/i.test(navigator.userAgent);
+const xrOverlay=document.getElementById("xr-overlay"),xrExit=document.getElementById("xr-exit");
+xrExit.addEventListener("beforexrselect",e=>e.preventDefault());
+xrExit.addEventListener("click",()=>{const s_=renderer.xr.getSession();if(s_)s_.end();});
+function resetWorld(){world.scale.setScalar(1);world.position.set(0,0,0);}
 async function startXR(mode){
+  let session=null;
+  const phoneAR=mode==="immersive-ar"&&!isHeadset;
   try{
-    const session=await navigator.xr.requestSession(mode,{optionalFeatures:["local-floor","bounded-floor","hand-tracking"]});
+    const opts=phoneAR?{optionalFeatures:["dom-overlay"],domOverlay:{root:xrOverlay}}:{optionalFeatures:["local-floor","bounded-floor","hand-tracking"]};
+    session=await navigator.xr.requestSession(mode,opts);
+    // gerçekten hangi referans uzayı var? (telefonlarda çoğu zaman yalnızca 'local')
+    let space="local";
+    if(!phoneAR){try{await session.requestReferenceSpace("local-floor");space="local-floor";}catch(_){}}
     xrMode=mode;
     if(mode==="immersive-ar"){scene.background=null;floor.visible=false;}
-    try{renderer.xr.setReferenceSpaceType("local-floor");await renderer.xr.setSession(session);world.position.y=0;}
-    catch(_){renderer.xr.setReferenceSpaceType("local");await renderer.xr.setSession(session);world.position.y=-1.45;}
+    if(phoneAR){world.scale.setScalar(0.55);world.position.set(0,-0.86,-0.08);xrOverlay.hidden=false;} // dörtyüzlü telefonun ~60 cm önünde
+    else if(space==="local"){resetWorld();world.position.y=-1.45;}
+    else resetWorld();
+    renderer.xr.setReferenceSpaceType(space);
+    await renderer.xr.setSession(session);
     controls.enabled=false;layout(true);
-    session.addEventListener("end",()=>{xrMode=null;scene.background=BG;floor.visible=true;world.position.y=0;controls.enabled=true;layout(false);});
-  }catch(err){msg.textContent="Oturum başlatılamadı: "+(err&&err.message?err.message:err);}
+    session.addEventListener("end",()=>{xrMode=null;scene.background=BG;floor.visible=true;resetWorld();xrOverlay.hidden=true;controls.enabled=true;layout(false);});
+  }catch(err){
+    msg.textContent="Oturum başlatılamadı: "+(err&&err.message?err.message:err);
+    scene.background=BG;floor.visible=true;resetWorld();xrOverlay.hidden=true;
+    if(session){try{await session.end();}catch(_){}}
+  }
 }
 bVR.addEventListener("click",()=>startXR("immersive-vr"));
 bAR.addEventListener("click",()=>startXR("immersive-ar"));
@@ -378,7 +424,7 @@ renderer.setAnimationLoop(now=>{
 
 /* başlat */
 P=homeP();drawModel(null);
-if(document.fonts&&document.fonts.load)Promise.all(['400 40px "STIX Two Text"','italic 400 40px "STIX Two Text"','600 40px "STIX Two Text"','italic 600 40px "STIX Two Text"','400 40px "IBM Plex Sans"','600 40px "IBM Plex Sans"'].map(f=>document.fonts.load(f).catch(()=>null))).then(()=>{infoTex.redraw();btnBg.redraw();buttons.forEach(b=>b.userData.tex.redraw());vertObjs.forEach(v=>v.tex.redraw());edgeObjs.forEach(e=>e.tagTex.redraw());});
+if(document.fonts&&document.fonts.load)Promise.all(['400 40px "STIX Two Text"','italic 400 40px "STIX Two Text"','600 40px "STIX Two Text"','italic 600 40px "STIX Two Text"','400 40px "IBM Plex Sans"','600 40px "IBM Plex Sans"'].map(f=>document.fonts.load(f).catch(()=>null))).then(()=>{infoTex.redraw();btnBg.redraw();buttons.forEach(b=>b.userData.tex.redraw());vertObjs.forEach(v=>v.tex.redraw());sockTags.forEach(t=>t.redraw());edgeObjs.forEach(e=>e.tagTex.redraw());});
 if(reduce){playing=false;tourBtn.userData.tex.redraw();setInfo(TOUR[0].name,"id",TOUR[0].sig,CAPTION.id);}else tourGo(0);
 
 /* test için */
