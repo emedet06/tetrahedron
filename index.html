@@ -1,0 +1,543 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Dörtyüzlünün 24 Simetrisi</title>
+<meta name="description" content="Düzgün dörtyüzlünün 24 simetrisi, üç karşılıklı ayrıt çiftini nasıl karıştırır? S4'ten S3'e giden eşleme ve çözücü kübik, adım adım.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=IBM+Plex+Sans:wght@400;500;600&family=STIX+Two+Text:ital,wght@0,400;0,600;1,400&display=swap">
+<style>
+/* Düzen: kareli defter (açık) / kara tahta (koyu) zemin; solda 3B sahne, sağda "son hamle" paneli; altta 24 simetrinin 6 sütunlu tablosu.
+   Tek parlak renkler üç ayrıt çiftine ayrıldı (y1, y2, y3); arayüzün geri kalanı mürekkep tonunda. */
+:root{
+  --paper:#F2F5F9; --gridline:#DFE7F0; --ink:#17212C; --muted:#536273; --card:#FFFFFF; --rule:#CAD5E1;
+  --face:#FFFFFF; --soft:#E6ECF3; --strong:#17212C; --on-strong:#FFFFFF;
+  --y1:#CF4318; --y2:#2259BE; --y3:#9C6E00;
+  --y1-soft:#FAE2D9; --y2-soft:#DEE7F8; --y3-soft:#F3E8CB;
+  --guide:#5A7DA3; --focus:#2259BE;
+  --display:"Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --body:"IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --math:"STIX Two Text", "Cambria Math", Cambria, "Times New Roman", serif;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --paper:#18221F; --gridline:#202C29; --ink:#E5EDE9; --muted:#9BACA6; --card:#1F2B28; --rule:#33433F;
+    --face:#2A3834; --soft:#29372F; --strong:#E5EDE9; --on-strong:#18221F;
+    --y1:#FF8160; --y2:#8AB0FF; --y3:#EDC456;
+    --y1-soft:#4B2C23; --y2-soft:#283653; --y3-soft:#463B1F;
+    --guide:#A3BDD8; --focus:#8AB0FF; color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#18221F; --gridline:#202C29; --ink:#E5EDE9; --muted:#9BACA6; --card:#1F2B28; --rule:#33433F;
+  --face:#2A3834; --soft:#29372F; --strong:#E5EDE9; --on-strong:#18221F;
+  --y1:#FF8160; --y2:#8AB0FF; --y3:#EDC456;
+  --y1-soft:#4B2C23; --y2-soft:#283653; --y3-soft:#463B1F;
+  --guide:#A3BDD8; --focus:#8AB0FF; color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{margin:0}
+[hidden]{display:none!important}
+body{
+  background-color:var(--paper);
+  background-image:linear-gradient(var(--gridline) 1px, transparent 1px),linear-gradient(90deg, var(--gridline) 1px, transparent 1px);
+  background-size:22px 22px;
+  color:var(--ink); font-family:var(--body); font-size:16px; line-height:1.55;
+}
+.wrap{max-width:1120px; margin:0 auto; padding-left:max(16px, env(safe-area-inset-left, 0px)); padding-right:max(16px, env(safe-area-inset-right, 0px)); padding-block:28px 56px; display:grid; gap:28px}
+.m{font-family:var(--math); font-size:1.08em; white-space:nowrap}
+.m i{font-style:italic}
+sub{font-size:.68em; line-height:0}
+.c0{color:var(--y1)} .c1{color:var(--y2)} .c2{color:var(--y3)}
+.dot{display:inline-block; width:.72em; height:.72em; border-radius:50%; flex:none}
+.dot.c0{background:var(--y1)} .dot.c1{background:var(--y2)} .dot.c2{background:var(--y3)}
+
+header{display:grid; gap:12px; max-width:760px}
+.eyebrow{font-size:.78rem; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); font-weight:600}
+h1{font-family:var(--display); font-weight:800; font-size:clamp(2.1rem, 6vw, 3.5rem); line-height:1.02; margin:0; text-wrap:balance; letter-spacing:-.01em}
+h1 .n{color:var(--y2)}
+.lead{margin:0; max-width:64ch; font-size:1.05rem}
+.legend{display:grid; gap:6px; margin:4px 0 0; padding:0; list-style:none}
+.legend li{display:flex; align-items:center; gap:10px; flex-wrap:wrap}
+.legend .what{color:var(--muted); font-size:.9rem}
+
+.lab{display:grid; grid-template-columns:minmax(0,1.08fr) minmax(0,.92fr); gap:20px; align-items:start}
+@media (max-width:860px){ .lab{grid-template-columns:minmax(0,1fr)} }
+.card{background:var(--card); border:1px solid var(--rule); border-radius:4px}
+.stagecard{display:grid; gap:0}
+.tabs{display:flex; border-bottom:1px solid var(--rule)}
+.tab{flex:1; appearance:none; border:0; background:transparent; color:var(--muted); font:600 .98rem var(--body); padding:12px 14px; cursor:pointer; border-bottom:3px solid transparent; margin-bottom:-1px}
+.tab[aria-selected="true"]{color:var(--ink); border-bottom-color:var(--ink)}
+.tab:focus-visible{outline:2px solid var(--focus); outline-offset:-4px}
+.stagebox{position:relative; padding:6px 10px 0}
+#stage{display:block; width:100%; max-width:540px; aspect-ratio:2.84/2.72; margin:0 auto; touch-action:none; cursor:grab; user-select:none; -webkit-user-select:none; transition:opacity .16s ease}
+#stage.dim{opacity:.15}
+#stage.dragging{cursor:grabbing}
+#stage text{font-family:var(--math)}
+.caption{padding:0 16px; min-height:2.6em; display:flex; align-items:center; justify-content:center; text-align:center; font-weight:500; text-wrap:balance}
+.controls{padding:12px 16px 16px; display:grid; gap:12px; border-top:1px solid var(--rule)}
+.row{display:flex; flex-wrap:wrap; gap:8px; align-items:center}
+.row .label{font-size:.85rem; color:var(--muted); flex-basis:100%}
+.btn{appearance:none; border:1px solid var(--rule); background:var(--card); color:var(--ink); font:500 .95rem var(--body); padding:7px 12px; border-radius:3px; cursor:pointer; min-height:38px; display:inline-flex; align-items:center; gap:7px}
+.btn:hover{border-color:var(--ink)}
+.btn:focus-visible{outline:2px solid var(--focus); outline-offset:2px}
+.btn[disabled]{opacity:.45; cursor:default}
+.btn.primary{background:var(--strong); color:var(--on-strong); border-color:var(--strong); min-width:112px; justify-content:center}
+.btn.math{font-family:var(--math); font-size:1.05rem}
+.btn .sw{width:10px; height:10px; border-radius:50%}
+.step{margin-left:auto; font-variant-numeric:tabular-nums; color:var(--muted); font-size:.92rem}
+.hint{margin:0; font-size:.88rem; color:var(--muted)}
+
+.panel{padding:18px 18px 20px; display:grid; gap:14px}
+.panel h2, .section h2{font-family:var(--display); font-weight:700; font-size:1.25rem; margin:0; letter-spacing:-.005em}
+.kicker{font-size:.76rem; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); font-weight:600}
+.movename{font-size:1.06rem; font-weight:600; text-wrap:balance; min-height:1.6em}
+.permrow{display:flex; align-items:baseline; gap:12px; flex-wrap:wrap}
+.cyc{font-family:var(--math); font-size:1.9rem; line-height:1.1}
+.badge{font-size:.78rem; font-weight:600; letter-spacing:.03em; padding:2px 8px; border-radius:20px; border:1px solid var(--rule); color:var(--muted)}
+.badge.ayna{border-color:var(--ink); color:var(--ink)}
+.small{font-size:.88rem; color:var(--muted); margin:0}
+.ylist{display:grid; gap:8px; margin:0; padding:0; list-style:none}
+.yrow{display:grid; grid-template-columns:auto minmax(0,1fr); gap:4px 10px; align-items:baseline; padding:8px 10px; background:var(--soft); border-radius:3px}
+.yrow .dot{align-self:center}
+.yrow .expr{display:flex; flex-wrap:wrap; gap:4px 8px; align-items:baseline; min-width:0}
+.yrow .arr{color:var(--muted)}
+.yrow b{font-family:var(--math); font-weight:600}
+.summary{font-weight:600}
+
+.section{display:grid; gap:14px}
+.section > p{margin:0; max-width:70ch}
+.ghead{display:flex; flex-wrap:wrap; align-items:baseline; gap:8px 16px}
+.count{font-variant-numeric:tabular-nums; color:var(--muted); font-weight:500}
+.cols{display:grid; grid-template-columns:repeat(6, minmax(0,1fr)); gap:10px}
+@media (max-width:980px){ .cols{grid-template-columns:repeat(3, minmax(0,1fr))} }
+@media (max-width:560px){ .cols{grid-template-columns:repeat(2, minmax(0,1fr))} }
+.col{background:var(--card); border:1px solid var(--rule); border-radius:4px; display:grid; grid-template-rows:auto; align-content:start}
+.col header{display:grid; gap:2px; padding:9px 10px 8px; border-bottom:1px solid var(--rule); max-width:none}
+.col .title{display:flex; align-items:center; gap:5px; flex-wrap:wrap; font-family:var(--math); font-size:1.02rem; min-height:1.5em}
+.col .sub{font-size:.74rem; color:var(--muted); letter-spacing:.02em}
+.cells{display:grid; gap:4px; padding:8px}
+.cell{display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:2px 6px; padding:6px 8px; border-radius:3px; border:1.5px solid transparent; background:transparent; color:var(--muted); opacity:.55; transition:background .3s, opacity .3s}
+.cell .cy{font-family:var(--math); font-size:1.02rem; white-space:nowrap}
+.cell .k{font-size:.68rem; letter-spacing:.03em; white-space:nowrap}
+.cell.seen{opacity:1; color:var(--ink); background:var(--soft)}
+.cell.now{border-color:var(--ink); opacity:1; color:var(--ink)}
+.note{display:grid; gap:10px; max-width:76ch}
+.note p{margin:0}
+.formula{font-family:var(--math); font-size:1.12rem; padding:12px 14px; background:var(--card); border:1px solid var(--rule); border-radius:4px; overflow-x:auto; white-space:nowrap}
+.vrlink{justify-self:start; font-weight:600; color:var(--ink); text-decoration:none; border:1px solid var(--rule); background:var(--card); padding:7px 12px; border-radius:3px}
+.vrlink:hover{border-color:var(--ink)}
+.vrlink:focus-visible{outline:2px solid var(--focus); outline-offset:2px}
+footer{font-size:.86rem; color:var(--muted); border-top:1px solid var(--rule); padding-top:14px}
+@media (prefers-reduced-motion: reduce){ #stage, .cell{transition:none} }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Galois Origami Biliyor muydu? · etkileşimli ek</div>
+    <h1>Dörtyüzlünün <span class="n">24</span> simetrisi</h1>
+    <a class="vrlink" href="vr.html">Sanal gerçeklikte aç (VR / AR) →</a>
+    <p class="lead">Köşelere yazdığımız 1, 2, 3, 4 bir dördüncü derece polinomun dört kökü olsun: <span class="m"><i>x</i><sub>1</sub>, <i>x</i><sub>2</sub>, <i>x</i><sub>3</sub>, <i>x</i><sub>4</sub></span>. Altı ayrıtı, ortak köşesi olmayan üç çifte ayırıp her çifti bir renge boyadık ve her çifte bir sayı karşılık getirdik. Dörtyüzlüyü hangi simetriyle hareket ettirirseniz ettirin, bu üç renkli çift yalnızca kendi aralarında yer değiştirir.</p>
+    <ul class="legend" aria-label="Üç ayrıt çifti">
+      <li><span class="dot c0"></span><span class="m"><i>y</i><sub>1</sub> = <i>x</i><sub>1</sub><i>x</i><sub>2</sub> + <i>x</i><sub>3</sub><i>x</i><sub>4</sub></span><span class="what">12 ve 34 ayrıtları</span></li>
+      <li><span class="dot c1"></span><span class="m"><i>y</i><sub>2</sub> = <i>x</i><sub>1</sub><i>x</i><sub>3</sub> + <i>x</i><sub>2</sub><i>x</i><sub>4</sub></span><span class="what">13 ve 24 ayrıtları</span></li>
+      <li><span class="dot c2"></span><span class="m"><i>y</i><sub>3</sub> = <i>x</i><sub>1</sub><i>x</i><sub>4</sub> + <i>x</i><sub>2</sub><i>x</i><sub>3</sub></span><span class="what">14 ve 23 ayrıtları</span></li>
+    </ul>
+  </header>
+
+  <div class="lab">
+    <section class="card stagecard" aria-label="Dörtyüzlü">
+      <div class="tabs" role="tablist">
+        <button class="tab" id="tab-tour" role="tab" aria-selected="true">İzle</button>
+        <button class="tab" id="tab-try" role="tab" aria-selected="false">Kendin dene</button>
+      </div>
+      <div class="stagebox">
+        <svg id="stage" viewBox="-1.42 -1.36 2.84 2.72" role="img" aria-label="Köşeleri numaralı, karşılıklı ayrıtları aynı renge boyanmış düzgün dörtyüzlü"><g id="scene"></g></svg>
+      </div>
+      <div class="caption" id="caption" aria-live="polite"></div>
+
+      <div class="controls" id="tour-controls">
+        <div class="row">
+          <button class="btn" id="prev" aria-label="Önceki simetri">‹ Önceki</button>
+          <button class="btn primary" id="play">Duraklat</button>
+          <button class="btn" id="next" aria-label="Sonraki simetri">Sonraki ›</button>
+          <span class="step" id="stepnum">1 / 24</span>
+        </div>
+        <p class="hint">Dörtyüzlüyü sürükleyerek her yanından bakabilirsiniz.</p>
+      </div>
+
+      <div class="controls" id="try-controls" hidden>
+        <div class="row">
+          <span class="label">Bir köşeden tutup 120° çevirin</span>
+          <button class="btn math" data-v="1">1</button><button class="btn math" data-v="2">2</button><button class="btn math" data-v="3">3</button><button class="btn math" data-v="4">4</button>
+        </div>
+        <div class="row">
+          <span class="label">Karşılıklı iki ayrıtın ortasından tutup 180° çevirin</span>
+          <button class="btn math" data-h="0"><span class="sw dot c0"></span>12 · 34</button><button class="btn math" data-h="1"><span class="sw dot c1"></span>13 · 24</button><button class="btn math" data-h="2"><span class="sw dot c2"></span>14 · 23</button>
+        </div>
+        <div class="row">
+          <span class="label">Aynada yansıtın (iki köşe yer değiştirir; kâğıt modelle yapılamaz)</span>
+          <button class="btn math" data-m="1,2">1 ↔ 2</button><button class="btn math" data-m="1,3">1 ↔ 3</button><button class="btn math" data-m="1,4">1 ↔ 4</button><button class="btn math" data-m="2,3">2 ↔ 3</button><button class="btn math" data-m="2,4">2 ↔ 4</button><button class="btn math" data-m="3,4">3 ↔ 4</button>
+        </div>
+        <div class="row">
+          <button class="btn" id="reset">Başa dön</button>
+          <button class="btn" id="clear">Tabloyu boşalt</button>
+        </div>
+        <p class="hint">Köşeye dokunmak o köşe etrafında, ayrıta dokunmak o ayrıtın ortasından geçen eksen etrafında çevirir. Sürüklemek yalnızca bakış açısını değiştirir.</p>
+      </div>
+    </section>
+
+    <aside class="card panel" aria-live="polite">
+      <div class="kicker">Son hamle</div>
+      <div class="movename" id="movename">Başlangıç</div>
+      <div class="permrow"><span class="cyc" id="cyc">(1)</span><span class="badge" id="kind">özdeşlik</span></div>
+      <p class="small" id="cycexplain">Hiçbir köşe yer değiştirmedi.</p>
+      <div class="kicker">Kökleri yer değiştirince y'ler</div>
+      <ul class="ylist" id="ylist"></ul>
+      <div class="summary" id="ysum"></div>
+      <p class="small" id="total"></p>
+    </aside>
+  </div>
+
+  <section class="section" aria-labelledby="g-title">
+    <div class="ghead"><h2 id="g-title">24 simetri, 6 sütun</h2><span class="count" id="count">1 / 24 görüldü</span></div>
+    <p>Her simetriyi, üç <span class="m"><i>y</i></span>'yi nasıl karıştırdığına göre bir sütuna yerleştirdik. Gördüğünüz simetriler koyulaşır, şu anki duruş çerçeveli görünür.</p>
+    <div class="cols" id="cols"></div>
+    <div class="note">
+      <p>Her sütunda tam 4 simetri var. İlk sütundakiler (hiçbir şey yapmamak ve üç yarım dönme) çiftleri hiç oynatmaz; yazıdaki <span class="m"><i>V</i><sub>4</sub></span> budur. <span class="m">24 = 6 × 4</span>, yani <span class="m"><i>S</i><sub>4</sub>/<i>V</i><sub>4</sub> ≅ <i>S</i><sub>3</sub></span>.</p>
+      <p>Kâğıt modelle yalnızca 12 dönmeyi yapabilirsiniz; bunlar ilk üç sütunu doldurur. İki <span class="m"><i>y</i></span>'yi takas eden son üç sütun için ayna gerekir.</p>
+    </div>
+  </section>
+
+  <section class="section" aria-labelledby="w-title">
+    <h2 id="w-title">Bu neden dördüncü dereceyi çözer?</h2>
+    <div class="note">
+      <p>Hiçbir simetri üç <span class="m"><i>y</i></span>'yi kendi aralarında karıştırmaktan başka bir şey yapamadığı için, onların toplamı, ikişerli çarpımlarının toplamı ve çarpımı köklerin hiçbir yer değiştirmesiyle bozulmaz. Böyle sayılar polinomun katsayılarından hesaplanabilir. Yani kökleri bilmeden, kökleri tam olarak <span class="m"><i>y</i><sub>1</sub>, <i>y</i><sub>2</sub>, <i>y</i><sub>3</sub></span> olan üçüncü derece denklemi, çözücü kübiği yazabiliriz:</p>
+      <div class="formula"><i>x</i><sup>4</sup> + <i>ax</i><sup>3</sup> + <i>bx</i><sup>2</sup> + <i>cx</i> + <i>d</i> &nbsp;için&nbsp; <i>y</i><sup>3</sup> − <i>by</i><sup>2</sup> + (<i>ac</i> − 4<i>d</i>)<i>y</i> − (<i>a</i><sup>2</sup><i>d</i> − 4<i>bd</i> + <i>c</i><sup>2</sup>) = 0</div>
+      <p>Bu kübiği tek bir katla (altıncı aksiyom) çözüp bir <span class="m"><i>y</i></span> bulmak yeter. Örneğin <span class="m"><i>x</i><sub>1</sub><i>x</i><sub>2</sub></span> ile <span class="m"><i>x</i><sub>3</sub><i>x</i><sub>4</sub></span>'ün toplamı <span class="m"><i>y</i><sub>1</sub></span>, çarpımı <span class="m"><i>d</i></span> olduğundan ikisi bir ikinci derece denklemin kökleridir. Geriye yalnızca karekökler kalır. Pergel ve cetvel kübikte takılır, katlanan kâğıt takılmaz.</p>
+    </div>
+  </section>
+
+  <footer>Elif Medetoğulları, “Galois Origami Biliyor muydu?”, <i>Matematik Dünyası</i> yazısına eşlik eden etkileşimli sayfa.</footer>
+</div>
+
+<script>
+(function(){
+"use strict";
+/* ---------- küçük vektör/matris araçları ---------- */
+const dot=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
+const cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];
+const add=(a,b)=>[a[0]+b[0],a[1]+b[1],a[2]+b[2]];
+const sub=(a,b)=>[a[0]-b[0],a[1]-b[1],a[2]-b[2]];
+const mul=(a,s)=>[a[0]*s,a[1]*s,a[2]*s];
+const len=a=>Math.hypot(a[0],a[1],a[2]);
+const unit=a=>mul(a,1/len(a));
+const mv=(M,v)=>[0,1,2].map(i=>M[i][0]*v[0]+M[i][1]*v[1]+M[i][2]*v[2]);
+const mm=(A,B)=>[0,1,2].map(i=>[0,1,2].map(j=>A[i][0]*B[0][j]+A[i][1]*B[1][j]+A[i][2]*B[2][j]));
+const det3=M=>M[0][0]*(M[1][1]*M[2][2]-M[1][2]*M[2][1])-M[0][1]*(M[1][0]*M[2][2]-M[1][2]*M[2][0])+M[0][2]*(M[1][0]*M[2][1]-M[1][1]*M[2][0]);
+const roundM=M=>M.map(r=>r.map(x=>Math.round(x)+0));
+const eqM=(A,B)=>A.every((r,i)=>r.every((x,j)=>x===B[i][j]));
+function rotMat(u,t){const [x,y,z]=unit(u),c=Math.cos(t),s=Math.sin(t),k=1-c;
+  return [[c+x*x*k,x*y*k-z*s,x*z*k+y*s],[y*x*k+z*s,c+y*y*k,y*z*k-x*s],[z*x*k-y*s,z*y*k+x*s,c+z*z*k]];}
+function rotFromTo(a,b){a=unit(a);b=unit(b);const ax=cross(a,b);return rotMat(ax,Math.acos(Math.max(-1,Math.min(1,dot(a,b)))));}
+
+/* ---------- dörtyüzlü: köşeler (±1,±1,±1) içinden, karşılıklı ayrıt çiftleri = koordinat eksenleri ---------- */
+const HOME_INT=[null,[1,1,1],[1,-1,-1],[-1,1,-1],[-1,-1,1]];
+const R3=Math.sqrt(3);
+const HOME=HOME_INT.map(v=>v&&mul(v,1/R3));
+const PAIRS=[[[1,2],[3,4]],[[1,3],[2,4]],[[1,4],[2,3]]];   // y1 ↔ x ekseni, y2 ↔ y ekseni, y3 ↔ z ekseni
+const EDGES=[[1,2],[3,4],[1,3],[2,4],[1,4],[2,3]];
+const FACES=[[1,2,3],[1,2,4],[1,3,4],[2,3,4]];
+const ekey=(a,b)=>a<b?a*10+b:b*10+a;
+const pairKey=j=>PAIRS[j].map(e=>ekey(e[0],e[1])).sort().join("|");
+const PAIR_KEYS=[0,1,2].map(pairKey);
+const edgePair=(a,b)=>PAIRS.findIndex(p=>p.some(e=>ekey(e[0],e[1])===ekey(a,b)));
+const AXES=[[1,0,0],[0,1,0],[0,0,1]];
+
+/* bir permütasyonun (k ↦ sig[k]) y'lere etkisi: y_j ↦ y_tau[j] */
+function inducedTau(sig){
+  return [0,1,2].map(j=>{const key=PAIRS[j].map(e=>ekey(sig[e[0]],sig[e[1]])).sort().join("|");return PAIR_KEYS.indexOf(key);});
+}
+function cycleStr(sig){
+  const seen={};let out="";
+  for(let k=1;k<=4;k++){ if(seen[k]||sig[k]===k)continue; const c=[k];seen[k]=1;let j=sig[k];
+    while(j!==k){c.push(j);seen[j]=1;j=sig[j];} out+="("+c.join(" ")+")"; }
+  return out||"(1)";
+}
+const sigKey=sig=>sig.slice(1).join("");
+
+/* ---------- 24 simetri: işaretli permütasyon matrisleri (işaretlerin çarpımı +1) ---------- */
+const P3=[[0,1,2],[1,2,0],[2,0,1],[0,2,1],[2,1,0],[1,0,2]];
+const SG=[[1,1,1],[1,-1,-1],[-1,1,-1],[-1,-1,1]];
+const GROUP=[];
+for(const p of P3)for(const s of SG){
+  const M=[[0,0,0],[0,0,0],[0,0,0]];
+  for(let i=0;i<3;i++)M[p[i]][i]=s[i];
+  GROUP.push(analyze(M,p));
+}
+function analyze(M,p){
+  const sig=[0];
+  for(let k=1;k<=4;k++){const w=mv(M,HOME_INT[k]);sig[k]=HOME_INT.findIndex((v,m)=>m>0&&v[0]===w[0]&&v[1]===w[1]&&v[2]===w[2]);}
+  const d=Math.round(det3(M)), tr=M[0][0]+M[1][1]+M[2][2];
+  const g={M,sig,tau:p.slice(),det:d,cyc:cycleStr(sig)};
+  if(tr===3){g.kind="id";g.anim={type:"none"};g.name="Hiçbir şey yapmamak";g.ord=0;}
+  else if(d===1&&tr===-1){const i=[0,1,2].find(i=>M[i][i]===1);const pr=PAIRS[i];
+    g.kind="half";g.anim={type:"rot",u:AXES[i],ang:Math.PI};g.ord=10+i;
+    g.name=`${pr[0].join("")} ve ${pr[1].join("")} ayrıtlarının ortasından geçen eksen etrafında 180°`;}
+  else if(d===1){const k=[1,2,3,4].find(k=>sig[k]===k);const u=HOME[k];
+    const w=[M[2][1]-M[1][2],M[0][2]-M[2][0],M[1][0]-M[0][1]];const pos=dot(w,u)>0;
+    g.kind="vertex";g.anim={type:"rot",u,ang:pos?2*Math.PI/3:4*Math.PI/3};g.ord=20+k*2+(pos?0:1);
+    g.name=`${k} köşesinden geçen eksen etrafında ${pos?120:240}°`;}
+  else if(tr===1){const I_M=[0,1,2].map(i=>[0,1,2].map(j=>(i===j?1:0)-M[i][j]));
+    const cols=[0,1,2].map(j=>[I_M[0][j],I_M[1][j],I_M[2][j]]);const c=cols.reduce((a,b)=>len(b)>len(a)?b:a);
+    const sw=[1,2,3,4].filter(k=>sig[k]!==k);
+    g.kind="mirror";g.anim={type:"mirror",n:unit(c)};g.ord=40+sw[0]*5+sw[1];
+    g.name=`${sw[0]} ile ${sw[1]} köşelerini takas eden ayna`;}
+  else {const i=p.findIndex((q,ii)=>q===ii);const Mi=[[1,0,0],[0,1,0],[0,0,1]];Mi[i][i]=-1;const R=mm(Mi,M);
+    const w=[R[2][1]-R[1][2],R[0][2]-R[2][0],R[1][0]-R[0][1]];
+    g.kind="roto";g.anim={type:"roto",u:AXES[i],ang:w[i]>0?Math.PI/2:-Math.PI/2};g.ord=60;
+    g.name=`${PAIRS[i][0].join("")} · ${PAIRS[i][1].join("")} ekseni etrafında 90° döndür, sonra aynala`;}
+  return g;
+}
+const KIND_LABEL={id:"özdeşlik",half:"dönme",vertex:"dönme",mirror:"ayna",roto:"dönme + ayna"};
+const findBySig=sig=>GROUP.find(g=>sigKey(g.sig)===sigKey(sig));
+const findByM=M=>GROUP.find(g=>eqM(g.M,M));
+const TOUR=GROUP.slice().sort((a,b)=>a.ord-b.ord||(a.cyc<b.cyc?-1:a.cyc>b.cyc?1:0));
+const GROUP_CAPTION={id:"Başlangıç: hiçbir şey yapmıyoruz.",half:"Yarım dönmeler: renkli çiftler yerinde kalır.",vertex:"Bir köşeden tutup çevirince üç çift sırayla yer değiştirir.",mirror:"Ayna: iki çift takas olur, biri yerinde kalır.",roto:"Döndür ve aynala: dört köşe birden dolaşır, yine iki çift takas olur."};
+
+/* ---------- y'ler için yazım ---------- */
+const X=i=>`<i>x</i><sub>${i}</sub>`, Y=j=>`<i>y</i><sub>${j+1}</sub>`;
+function tauText(t){
+  if(t[0]===0&&t[1]===1&&t[2]===2)return "Hiçbir <i>y</i> yer değiştirmedi.";
+  const fixed=[0,1,2].filter(j=>t[j]===j);
+  if(fixed.length===1){const o=[0,1,2].filter(j=>j!==fixed[0]);return `<span class="m">${Y(o[0])} ↔ ${Y(o[1])}</span> takas oldu, <span class="m">${Y(fixed[0])}</span> yerinde.`;}
+  return `<span class="m">${Y(0)} → ${Y(t[0])} → ${Y(t[t[0]])} → ${Y(0)}</span> sırayla döndü.`;
+}
+function tauHead(t){
+  const d=j=>`<span class="dot c${j}"></span>`;
+  if(t[0]===0&&t[1]===1&&t[2]===2)return `${d(0)}${d(1)}${d(2)}<span>hepsi yerinde</span>`;
+  const fixed=[0,1,2].filter(j=>t[j]===j);
+  if(fixed.length===1){const o=[0,1,2].filter(j=>j!==fixed[0]);return `${d(o[0])}${Y(o[0])} ↔ ${Y(o[1])}${d(o[1])}`;}
+  return `${Y(0)}→${Y(t[0])}→${Y(t[t[0]])}→${Y(0)}`;
+}
+function cycExplain(sig){
+  const moved=[1,2,3,4].filter(k=>sig[k]!==k);
+  if(!moved.length)return "Hiçbir köşe yer değiştirmedi.";
+  return moved.map(k=>`${k} → ${sig[k]}`).join(", ")+" (her köşe okun gösterdiği köşenin yerine gider).";
+}
+
+/* ---------- durum ---------- */
+let C=null;                       // kamera
+let state=[0,1,2,3,4];            // etiket k şu an hangi yuvada (başlangıç yuvaları 1..4)
+let P={};                         // etiketlerin anlık dünya konumları
+let anim=null, mode="tour", playing=true, tourIdx=0, tourTimer=null, startTimer=null;
+const seen=new Set();
+const reduce=window.matchMedia&&window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+const F=5.2;
+const homeP=()=>{const o={};for(let k=1;k<=4;k++)o[k]=HOME[state[k]].slice();return o;};
+
+function initCamera(){
+  const Q=rotFromTo(HOME[1],[0,1,0]);
+  C=mm(rotMat([1,0,0],0.36),mm(rotMat([0,1,0],0.42),Q));
+}
+
+/* ---------- çizim ---------- */
+const svg=document.getElementById("scene"), stage=document.getElementById("stage");
+const cam=v=>mv(C,v);
+const proj=c=>{const k=F/(F-c[2]);return [c[0]*k,-c[1]*k,k];};
+const f3=x=>x.toFixed(3);
+function render(overlay){
+  const cp={},pp={};
+  for(let k=1;k<=4;k++){cp[k]=cam(P[k]);pp[k]=proj(cp[k]);}
+  const eye=[0,0,F];
+  const faces=FACES.map(f=>{const a=cp[f[0]],b=cp[f[1]],c=cp[f[2]];let n=cross(sub(b,a),sub(c,a));
+    const cen=mul(add(add(a,b),c),1/3);if(dot(n,cen)<0)n=mul(n,-1);
+    const front=len(n)<1e-4||dot(n,sub(eye,cen))>0;return {f,z:cen[2],front};});
+  faces.sort((a,b)=>a.z-b.z);
+  const edgeFront=(a,b)=>faces.some(F_=>F_.front&&F_.f.includes(a)&&F_.f.includes(b));
+  let h="";
+  const line=(a,b,cls,extra="")=>`<line x1="${f3(pp[a][0])}" y1="${f3(pp[a][1])}" x2="${f3(pp[b][0])}" y2="${f3(pp[b][1])}" class="${cls}" ${extra}/>`;
+  const col=j=>`var(--y${j+1})`;
+  // arka ayrıtlar
+  for(const [a,b] of EDGES)if(!edgeFront(a,b))h+=line(a,b,"",`stroke="${col(edgePair(a,b))}" stroke-width="2.2" stroke-dasharray="5 5" stroke-linecap="round" opacity=".75" vector-effect="non-scaling-stroke"`);
+  // yüzler
+  for(const fc of faces){const pts=fc.f.map(k=>`${f3(pp[k][0])},${f3(pp[k][1])}`).join(" ");
+    h+=`<polygon points="${pts}" fill="var(--face)" fill-opacity="${fc.front?0.62:0.35}" stroke="none"/>`;}
+  // kılavuz: eksen ya da ayna
+  if(overlay){
+    if(overlay.axis){const u=overlay.axis,A=proj(cam(mul(u,1.32))),B=proj(cam(mul(u,-1.32)));
+      h+=`<line x1="${f3(A[0])}" y1="${f3(A[1])}" x2="${f3(B[0])}" y2="${f3(B[1])}" stroke="var(--guide)" stroke-width="1.6" stroke-dasharray="2 5" stroke-linecap="round" vector-effect="non-scaling-stroke"/>`;
+      h+=`<circle cx="${f3(A[0])}" cy="${f3(A[1])}" r="0.03" fill="var(--guide)"/><circle cx="${f3(B[0])}" cy="${f3(B[1])}" r="0.03" fill="var(--guide)"/>`;}
+    if(overlay.plane){const n=overlay.plane;let t=Math.abs(n[0])<0.9?[1,0,0]:[0,1,0];const e1=unit(cross(n,t)),e2=cross(n,e1);
+      const s=1.2,cs=[[s,s],[s,-s],[-s,-s],[-s,s]].map(([p,q])=>proj(cam(add(mul(e1,p),mul(e2,q)))));
+      h+=`<polygon points="${cs.map(c=>f3(c[0])+","+f3(c[1])).join(" ")}" fill="var(--guide)" fill-opacity=".15" stroke="var(--guide)" stroke-width="1.2" stroke-dasharray="4 4" vector-effect="non-scaling-stroke"/>`;}
+  }
+  // ön ayrıtlar
+  for(const [a,b] of EDGES)if(edgeFront(a,b))h+=line(a,b,"",`stroke="${col(edgePair(a,b))}" stroke-width="4.2" stroke-linecap="round" vector-effect="non-scaling-stroke"`);
+  // ayrıt etiketleri
+  for(const [a,b] of EDGES){const j=edgePair(a,b);const m=proj(cam(mul(add(P[a],P[b]),0.5*1.2)));const fr=edgeFront(a,b);
+    h+=`<text x="${f3(m[0])}" y="${f3(m[1])}" font-size="${f3(0.105*m[2])}" text-anchor="middle" dominant-baseline="central" fill="${col(j)}" opacity="${fr?0.95:0.45}" font-style="italic" pointer-events="none">y<tspan font-size="${f3(0.07*m[2])}" dy="0.03" font-style="normal">${j+1}</tspan></text>`;}
+  // dokunma alanları
+  if(mode==="try")for(const [a,b] of EDGES)h+=line(a,b,"hit",`stroke="transparent" stroke-width="22" vector-effect="non-scaling-stroke" data-a="${a}" data-b="${b}" style="cursor:pointer"`);
+  // köşeler
+  const order=[1,2,3,4].sort((a,b)=>cp[a][2]-cp[b][2]);
+  for(const k of order){const [x,y,s]=pp[k];const back=cp[k][2]<-0.25;
+    h+=`<g data-k="${k}" style="${mode==="try"?"cursor:pointer":""}" opacity="${back?0.6:1}"><circle cx="${f3(x)}" cy="${f3(y)}" r="${f3(0.115*s)}" fill="var(--card)" stroke="var(--ink)" stroke-width="2" vector-effect="non-scaling-stroke" data-k="${k}"/>`+
+       `<text x="${f3(x)}" y="${f3(y)}" font-size="${f3(0.14*s)}" text-anchor="middle" dominant-baseline="central" fill="var(--ink)" font-weight="600" data-k="${k}">${k}</text></g>`;}
+  svg.innerHTML=h;
+}
+
+/* ---------- hareket ---------- */
+const ease=t=>t<.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2;
+function posAt(d,v,t){
+  if(d.type==="rot")return mv(rotMat(d.u,d.ang*ease(t)),v);
+  if(d.type==="mirror"){const e=ease(t);return sub(v,mul(d.n,2*e*dot(v,d.n)));}
+  if(d.type==="roto"){if(t<0.55)return mv(rotMat(d.u,d.ang*ease(t/0.55)),v);
+    const w=mv(rotMat(d.u,d.ang),v),e=ease((t-0.55)/0.45);return sub(w,mul(d.u,2*e*dot(w,d.u)));}
+  return v;
+}
+function overlayAt(d,t){
+  if(d.type==="rot")return {axis:d.u};
+  if(d.type==="mirror")return {plane:d.n};
+  if(d.type==="roto")return t<0.55?{axis:d.u}:{plane:d.u};
+  return null;
+}
+function duration(d){
+  if(reduce)return 0;
+  if(d.type==="rot")return Math.abs(d.ang)>Math.PI+0.1?2100:(Math.abs(d.ang)>3?1600:1300);
+  if(d.type==="mirror")return 1500;
+  if(d.type==="roto")return 2700;
+  return 0;
+}
+function runMove(d,done){
+  const P0={};for(let k=1;k<=4;k++)P0[k]=P[k].slice();
+  const dur=duration(d);
+  if(!dur||d.type==="none"){done();return;}
+  const t0=performance.now();
+  anim={d,P0,t0,dur,done};
+  requestAnimationFrame(tick);
+}
+function tick(now){
+  if(!anim)return;
+  const t=Math.min(1,(now-anim.t0)/anim.dur);
+  for(let k=1;k<=4;k++)P[k]=posAt(anim.d,anim.P0[k],t);
+  render(overlayAt(anim.d,t));
+  if(t<1)requestAnimationFrame(tick);else{const cb=anim.done;anim=null;cb();}
+}
+
+/* ---------- panel ve tablo ---------- */
+const $=id=>document.getElementById(id);
+function showMove(name,kind,rho){
+  $("movename").textContent=name;
+  $("cyc").textContent=cycleStr(rho);
+  const b=$("kind");b.textContent=KIND_LABEL[kind];b.className="badge"+(kind==="mirror"||kind==="roto"?" ayna":"");
+  $("cycexplain").textContent=cycExplain(rho);
+  const t=inducedTau(rho);
+  $("ylist").innerHTML=[0,1,2].map(j=>{const [[a,b2],[c,d]]=PAIRS[j];
+    return `<li class="yrow"><span class="dot c${j}"></span><span class="expr"><span class="m">${Y(j)} = ${X(a)}${X(b2)} + ${X(c)}${X(d)}</span><span class="arr">→</span><span class="m">${X(rho[a])}${X(rho[b2])} + ${X(rho[c])}${X(rho[d])}</span><span class="m">= <b class="c${t[j]}">${Y(t[j])}</b></span></span></li>`;}).join("");
+  $("ysum").innerHTML=tauText(t);
+}
+function showTotal(){
+  const g=findBySig(state);
+  $("total").innerHTML=mode==="try"?`Başlangıca göre toplam duruş: <span class="m">${g.cyc}</span> (${KIND_LABEL[g.kind]}). Tabloda çerçeveli.`:"";
+}
+const COL_ORDER=[[0,1,2],[1,2,0],[2,0,1],[0,2,1],[2,1,0],[1,0,2]];
+const COL_SUB=["V₄: çiftler yerinde","dönmeler","dönmeler","ayna gerekir","ayna gerekir","ayna gerekir"];
+function buildGrid(){
+  $("cols").innerHTML=COL_ORDER.map((t,ci)=>{const els=TOUR.filter(g=>g.tau.join("")===t.join(""));
+    return `<div class="col"><header><div class="title">${tauHead(t)}</div><div class="sub">${COL_SUB[ci]}</div></header><div class="cells">`+
+      els.map(g=>`<div class="cell" data-key="${sigKey(g.sig)}" title="${g.name}"><span class="cy">${g.cyc}</span><span class="k">${KIND_LABEL[g.kind]}</span></div>`).join("")+`</div></div>`;}).join("");
+}
+function refreshGrid(){
+  const cur=sigKey(state);
+  document.querySelectorAll(".cell").forEach(el=>{const k=el.dataset.key;el.classList.toggle("seen",seen.has(k));el.classList.toggle("now",k===cur);});
+  $("count").textContent=`${seen.size} / 24 görüldü`;
+}
+function settle(){P=homeP();render(null);seen.add(sigKey(state));refreshGrid();showTotal();}
+
+/* ---------- İzle ---------- */
+function flash(){stage.classList.add("dim");setTimeout(()=>stage.classList.remove("dim"),170);}
+function tourGo(i){
+  clearTimeout(tourTimer);clearTimeout(startTimer);anim=null;
+  tourIdx=(i+24)%24;const g=TOUR[tourIdx];
+  if(sigKey(state)!=="1234"){flash();}
+  state=[0,1,2,3,4];P=homeP();render(null);refreshGrid();
+  $("stepnum").textContent=`${tourIdx+1} / 24`;
+  $("caption").textContent=GROUP_CAPTION[g.kind];
+  showMove(g.name,g.kind,g.sig);
+  startTimer=setTimeout(()=>runMove(g.anim,()=>{state=g.sig.slice();settle();
+    if(playing&&mode==="tour")tourTimer=setTimeout(()=>tourGo(tourIdx+1),reduce?2600:1700);}),reduce?0:260);
+}
+function setPlaying(p){playing=p;$("play").textContent=p?"Duraklat":"Oynat";clearTimeout(tourTimer);if(p&&!anim)tourGo(tourIdx+1);}
+
+/* ---------- Kendin dene ---------- */
+function applySpatial(M,d,name){
+  if(anim)return;
+  const g=findByM(roundM(M));if(!g)return;
+  const inv=[0];for(let k=1;k<=4;k++)inv[state[k]]=k;
+  const rho=[0];for(let k=1;k<=4;k++)rho[k]=inv[g.sig[state[k]]];
+  showMove(name,g.kind,rho);
+  $("caption").textContent=name;
+  runMove(d,()=>{const ns=[0];for(let k=1;k<=4;k++)ns[k]=g.sig[state[k]];state=ns;settle();});
+}
+function rotVertex(k){const u=HOME[state[k]];applySpatial(rotMat(u,2*Math.PI/3),{type:"rot",u,ang:2*Math.PI/3},`${k} köşesinden geçen eksen etrafında 120°`);}
+function halfTurn(a,b){const m=add(HOME_INT[state[a]],HOME_INT[state[b]]);const i=[0,1,2].find(i=>m[i]!==0);
+  const M=[[-1,0,0],[0,-1,0],[0,0,-1]];M[i][i]=1;const j=edgePair(a,b);const pr=PAIRS[j];
+  applySpatial(M,{type:"rot",u:AXES[i],ang:Math.PI},`${pr[0].join("")} ve ${pr[1].join("")} ayrıtlarının ortasından geçen eksen etrafında 180°`);}
+function mirror(a,b){const n=unit(sub(HOME[state[a]],HOME[state[b]]));
+  const M=[0,1,2].map(i=>[0,1,2].map(j=>(i===j?1:0)-2*n[i]*n[j]));
+  applySpatial(M,{type:"mirror",n},`${a} ile ${b} köşelerini takas eden ayna`);}
+
+function setMode(m){
+  mode=m;clearTimeout(tourTimer);clearTimeout(startTimer);anim=null;
+  $("tab-tour").setAttribute("aria-selected",m==="tour");$("tab-try").setAttribute("aria-selected",m==="try");
+  $("tour-controls").hidden=m!=="tour";$("try-controls").hidden=m!=="try";
+  state=[0,1,2,3,4];P=homeP();render(null);
+  if(m==="tour"){tourIdx=-1;if(playing)tourGo(0);else{tourIdx=0;tourGo(0);}}
+  else{$("caption").textContent="Bir hamle seçin ya da dörtyüzlüye dokunun.";showMove("Başlangıç","id",[0,1,2,3,4]);settle();}
+}
+
+/* ---------- olaylar ---------- */
+let drag=null;
+stage.addEventListener("pointerdown",e=>{drag={x:e.clientX,y:e.clientY,moved:false,target:e.target};try{stage.setPointerCapture(e.pointerId);}catch(_){}});
+stage.addEventListener("pointermove",e=>{if(!drag)return;const dx=e.clientX-drag.x,dy=e.clientY-drag.y;
+  if(!drag.moved&&Math.hypot(dx,dy)<5)return;
+  if(!drag.moved){drag.moved=true;stage.classList.add("dragging");}
+  C=mm(rotMat([0,1,0],dx*0.011),mm(rotMat([1,0,0],dy*0.011),C));drag.x=e.clientX;drag.y=e.clientY;
+  if(!anim)render(null);});
+const endDrag=e=>{if(!drag)return;const d=drag;drag=null;stage.classList.remove("dragging");
+  if(d.moved||mode!=="try")return;const t=d.target;
+  if(t&&t.dataset&&t.dataset.k)rotVertex(+t.dataset.k);
+  else if(t&&t.dataset&&t.dataset.a)halfTurn(+t.dataset.a,+t.dataset.b);};
+stage.addEventListener("pointerup",endDrag);
+stage.addEventListener("pointercancel",()=>{drag=null;stage.classList.remove("dragging");});
+
+$("tab-tour").addEventListener("click",()=>{if(mode!=="tour")setMode("tour");});
+$("tab-try").addEventListener("click",()=>{if(mode!=="try")setMode("try");});
+$("play").addEventListener("click",()=>setPlaying(!playing));
+$("next").addEventListener("click",()=>{playing=false;$("play").textContent="Oynat";tourGo(tourIdx+1);});
+$("prev").addEventListener("click",()=>{playing=false;$("play").textContent="Oynat";tourGo(tourIdx-1);});
+document.querySelectorAll("[data-v]").forEach(b=>b.addEventListener("click",()=>rotVertex(+b.dataset.v)));
+document.querySelectorAll("[data-h]").forEach(b=>b.addEventListener("click",()=>{const pr=PAIRS[+b.dataset.h][0];halfTurn(pr[0],pr[1]);}));
+document.querySelectorAll("[data-m]").forEach(b=>b.addEventListener("click",()=>{const [a,c]=b.dataset.m.split(",").map(Number);mirror(a,c);}));
+$("reset").addEventListener("click",()=>{if(anim)return;state=[0,1,2,3,4];showMove("Başlangıç","id",[0,1,2,3,4]);settle();});
+$("clear").addEventListener("click",()=>{seen.clear();seen.add(sigKey(state));refreshGrid();});
+
+/* test ve inceleme için */
+window.__dortyuzlu={GROUP,TOUR,inducedTau,cycleStr};
+
+/* ---------- başlat ---------- */
+initCamera();buildGrid();
+if(reduce){playing=false;$("play").textContent="Oynat";}
+P=homeP();render(null);seen.add("1234");refreshGrid();
+tourIdx=0;
+if(playing)tourGo(0);else{$("caption").textContent=GROUP_CAPTION.id;showMove(TOUR[0].name,"id",TOUR[0].sig);$("stepnum").textContent="1 / 24";}
+})();
+</script>
+
+</body>
+</html>

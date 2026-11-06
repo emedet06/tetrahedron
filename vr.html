@@ -1,0 +1,390 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Dörtyüzlünün 24 Simetrisi · VR</title>
+<meta name="description" content="Düzgün dörtyüzlünün 24 simetrisini sanal gerçeklikte (WebXR) inceleyin: üç karşılıklı ayrıt çifti ve çözücü kübiğin y'leri.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;600&family=STIX+Two+Text:ital,wght@0,400;0,600;1,400&display=swap">
+<style>
+  :root{ --bg:#18221F; --bar:rgba(24,34,31,.88); --ink:#E5EDE9; --muted:#9BACA6; --rule:#33433F; --accent:#8AB0FF; }
+  html,body{margin:0; height:100%; background:var(--bg); color:var(--ink); font-family:"IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif; overflow:hidden}
+  canvas{display:block; touch-action:none}
+  .bar{position:fixed; top:0; left:0; right:0; z-index:5; display:flex; flex-wrap:wrap; align-items:center; gap:8px 12px;
+       padding:calc(10px + env(safe-area-inset-top,0px)) max(14px, env(safe-area-inset-right,0px)) 10px max(14px, env(safe-area-inset-left,0px));
+       background:var(--bar); border-bottom:1px solid var(--rule); backdrop-filter:blur(6px)}
+  .bar strong{font-size:1rem; margin-right:auto}
+  .bar button,.bar a{font:600 .92rem inherit; font-family:inherit; color:var(--ink); background:transparent; border:1px solid var(--rule); border-radius:3px; padding:7px 12px; cursor:pointer; text-decoration:none}
+  .bar button.xr{background:var(--ink); color:var(--bg); border-color:var(--ink)}
+  .bar button:focus-visible,.bar a:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+  .help{position:fixed; left:0; right:0; bottom:0; z-index:5; margin:0; padding:10px max(14px, env(safe-area-inset-left,0px)) calc(10px + env(safe-area-inset-bottom,0px)); font-size:.86rem; color:var(--muted); background:var(--bar); border-top:1px solid var(--rule)}
+  #msg{font-size:.84rem; color:var(--muted); flex-basis:100%}
+  [hidden]{display:none!important}
+  @media (max-width:600px){ .bar strong{font-size:.95rem} .bar button,.bar a{padding:5px 10px; font-size:.85rem} #msg{font-size:.76rem} .help{font-size:.76rem; padding-top:7px} }
+</style>
+</head>
+<body>
+<div class="bar">
+  <strong>Dörtyüzlünün 24 simetrisi</strong>
+  <button class="xr" id="btn-vr" hidden>VR'da aç</button>
+  <button class="xr" id="btn-ar" hidden>Odanızda aç (AR)</button>
+  <a href="./">2B sayfa</a>
+  <span id="msg"></span>
+</div>
+<p class="help" id="help">Sürükleyerek etrafında dönün, iki parmakla ya da tekerlekle yaklaşın. Bir köşeye, bir ayrıta ya da hamle düğmelerine dokunun.</p>
+
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+<script type="module">
+import * as THREE from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { XRControllerModelFactory } from "three/addons/webxr/XRControllerModelFactory.js";
+
+/* ================= renkler ve yazı tipleri ================= */
+const COL = { bg:"#18221F", panel:"#1F2B28", soft:"#29372F", rule:"#33433F", ink:"#E5EDE9", muted:"#9BACA6",
+              y:["#FF8160","#8AB0FF","#EDC456"], guide:"#A3BDD8", disc:"#F4F7F5", discInk:"#18221F" };
+const FBODY = '"IBM Plex Sans", system-ui, sans-serif';
+const FMATH = '"STIX Two Text", "Cambria Math", Cambria, "Times New Roman", serif';
+
+/* ================= dörtyüzlü matematiği (2B sayfayla aynı) ================= */
+const dot=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
+const cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];
+const add=(a,b)=>[a[0]+b[0],a[1]+b[1],a[2]+b[2]], sub=(a,b)=>[a[0]-b[0],a[1]-b[1],a[2]-b[2]];
+const mul=(a,s)=>[a[0]*s,a[1]*s,a[2]*s], len=a=>Math.hypot(a[0],a[1],a[2]), unit=a=>mul(a,1/len(a));
+const mv=(M,v)=>[0,1,2].map(i=>M[i][0]*v[0]+M[i][1]*v[1]+M[i][2]*v[2]);
+const mm=(A,B)=>[0,1,2].map(i=>[0,1,2].map(j=>A[i][0]*B[0][j]+A[i][1]*B[1][j]+A[i][2]*B[2][j]));
+const det3=M=>M[0][0]*(M[1][1]*M[2][2]-M[1][2]*M[2][1])-M[0][1]*(M[1][0]*M[2][2]-M[1][2]*M[2][0])+M[0][2]*(M[1][0]*M[2][1]-M[1][1]*M[2][0]);
+const roundM=M=>M.map(r=>r.map(x=>Math.round(x)+0)), eqM=(A,B)=>A.every((r,i)=>r.every((x,j)=>x===B[i][j]));
+function rotMat(u,t){const [x,y,z]=unit(u),c=Math.cos(t),s=Math.sin(t),k=1-c;
+  return [[c+x*x*k,x*y*k-z*s,x*z*k+y*s],[y*x*k+z*s,c+y*y*k,y*z*k-x*s],[z*x*k-y*s,z*y*k+x*s,c+z*z*k]];}
+function rotFromTo(a,b){a=unit(a);b=unit(b);return rotMat(cross(a,b),Math.acos(Math.max(-1,Math.min(1,dot(a,b)))));}
+
+const HOME_INT=[null,[1,1,1],[1,-1,-1],[-1,1,-1],[-1,-1,1]], R3=Math.sqrt(3);
+const HOME=HOME_INT.map(v=>v&&mul(v,1/R3));
+const PAIRS=[[[1,2],[3,4]],[[1,3],[2,4]],[[1,4],[2,3]]];
+const EDGES=[[1,2],[3,4],[1,3],[2,4],[1,4],[2,3]];
+const FACES=[[1,2,3],[1,2,4],[1,3,4],[2,3,4]];
+const AXES=[[1,0,0],[0,1,0],[0,0,1]];
+const ekey=(a,b)=>a<b?a*10+b:b*10+a;
+const PAIR_KEYS=[0,1,2].map(j=>PAIRS[j].map(e=>ekey(e[0],e[1])).sort().join("|"));
+const edgePair=(a,b)=>PAIRS.findIndex(p=>p.some(e=>ekey(e[0],e[1])===ekey(a,b)));
+const inducedTau=sig=>[0,1,2].map(j=>PAIR_KEYS.indexOf(PAIRS[j].map(e=>ekey(sig[e[0]],sig[e[1]])).sort().join("|")));
+function cycleStr(sig){const seen={};let out="";
+  for(let k=1;k<=4;k++){if(seen[k]||sig[k]===k)continue;const c=[k];seen[k]=1;let j=sig[k];while(j!==k){c.push(j);seen[j]=1;j=sig[j];}out+="("+c.join(" ")+")";}
+  return out||"(1)";}
+const sigKey=sig=>sig.slice(1).join("");
+
+const P3=[[0,1,2],[1,2,0],[2,0,1],[0,2,1],[2,1,0],[1,0,2]], SG=[[1,1,1],[1,-1,-1],[-1,1,-1],[-1,-1,1]];
+const GROUP=[];
+for(const p of P3)for(const s of SG){const M=[[0,0,0],[0,0,0],[0,0,0]];for(let i=0;i<3;i++)M[p[i]][i]=s[i];GROUP.push(analyze(M,p));}
+function analyze(M,p){
+  const sig=[0];
+  for(let k=1;k<=4;k++){const w=mv(M,HOME_INT[k]);sig[k]=HOME_INT.findIndex((v,m)=>m>0&&v[0]===w[0]&&v[1]===w[1]&&v[2]===w[2]);}
+  const d=Math.round(det3(M)),tr=M[0][0]+M[1][1]+M[2][2],g={M,sig,tau:p.slice(),det:d,cyc:cycleStr(sig)};
+  if(tr===3){g.kind="id";g.anim={type:"none"};g.name="Hiçbir şey yapmamak";g.ord=0;}
+  else if(d===1&&tr===-1){const i=[0,1,2].find(i=>M[i][i]===1),pr=PAIRS[i];g.kind="half";g.anim={type:"rot",u:AXES[i],ang:Math.PI};g.ord=10+i;
+    g.name=`${pr[0].join("")} ve ${pr[1].join("")} ayrıtlarının ortasından geçen eksen etrafında 180°`;}
+  else if(d===1){const k=[1,2,3,4].find(k=>sig[k]===k),u=HOME[k],w=[M[2][1]-M[1][2],M[0][2]-M[2][0],M[1][0]-M[0][1]],pos=dot(w,u)>0;
+    g.kind="vertex";g.anim={type:"rot",u,ang:pos?2*Math.PI/3:4*Math.PI/3};g.ord=20+k*2+(pos?0:1);g.name=`${k} köşesinden geçen eksen etrafında ${pos?120:240}°`;}
+  else if(tr===1){const IM=[0,1,2].map(i=>[0,1,2].map(j=>(i===j?1:0)-M[i][j])),cols=[0,1,2].map(j=>[IM[0][j],IM[1][j],IM[2][j]]),c=cols.reduce((a,b)=>len(b)>len(a)?b:a),sw=[1,2,3,4].filter(k=>sig[k]!==k);
+    g.kind="mirror";g.anim={type:"mirror",n:unit(c)};g.ord=40+sw[0]*5+sw[1];g.name=`${sw[0]} ile ${sw[1]} köşelerini takas eden ayna`;}
+  else{const i=p.findIndex((q,ii)=>q===ii),Mi=[[1,0,0],[0,1,0],[0,0,1]];Mi[i][i]=-1;const R=mm(Mi,M),w=[R[2][1]-R[1][2],R[0][2]-R[2][0],R[1][0]-R[0][1]];
+    g.kind="roto";g.anim={type:"roto",u:AXES[i],ang:w[i]>0?Math.PI/2:-Math.PI/2};g.ord=60;g.name=`${PAIRS[i][0].join("")} · ${PAIRS[i][1].join("")} ekseni etrafında 90° döndür, sonra aynala`;}
+  return g;
+}
+const KIND={id:"özdeşlik",half:"dönme",vertex:"dönme",mirror:"ayna",roto:"dönme + ayna"};
+const KIND_SHORT={id:"özdeşlik",half:"dönme",vertex:"dönme",mirror:"ayna",roto:"d + ayna"};
+const findBySig=sig=>GROUP.find(g=>sigKey(g.sig)===sigKey(sig)), findByM=M=>GROUP.find(g=>eqM(g.M,M));
+const TOUR=GROUP.slice().sort((a,b)=>a.ord-b.ord||(a.cyc<b.cyc?-1:a.cyc>b.cyc?1:0));
+const CAPTION={id:"Başlangıç: hiçbir şey yapmıyoruz.",half:"Yarım dönme: renkli çiftler yerinde kalır.",vertex:"Köşeden çevirince üç çift sırayla yer değiştirir.",mirror:"Ayna: iki çift takas olur, biri yerinde kalır.",roto:"Döndür ve aynala: yine iki çift takas olur."};
+const SUB="₀₁₂₃₄", X=i=>"x"+SUB[i], Y=j=>"y"+SUB[j+1];
+const COLS=[[0,1,2],[1,2,0],[2,0,1],[0,2,1],[2,1,0],[1,0,2]];
+function tauHead(t){if(t.join("")==="012")return "hepsi yerinde";const f=[0,1,2].filter(j=>t[j]===j);
+  if(f.length===1){const o=[0,1,2].filter(j=>j!==f[0]);return `${Y(o[0])} ↔ ${Y(o[1])}`;}return `${Y(0)}→${Y(t[0])}→${Y(t[t[0]])}`;}
+function tauText(t){if(t.join("")==="012")return "Hiçbir y yer değiştirmedi.";const f=[0,1,2].filter(j=>t[j]===j);
+  if(f.length===1){const o=[0,1,2].filter(j=>j!==f[0]);return `${Y(o[0])} ↔ ${Y(o[1])} takas oldu, ${Y(f[0])} yerinde.`;}
+  return `${Y(0)} → ${Y(t[0])} → ${Y(t[t[0]])} → ${Y(0)} sırayla döndü.`;}
+
+/* ================= durum ================= */
+let state=[0,1,2,3,4],P={},anim=null,playing=true,tourIdx=0,tourTimer=null,startTimer=null;
+const reduce=matchMedia("(prefers-reduced-motion: reduce)").matches;
+const idKey=list=>list.map(o=>o.id).sort().join(",");
+
+/* ================= sahne ================= */
+const renderer=new THREE.WebGLRenderer({antialias:true,alpha:true});
+renderer.setPixelRatio(Math.min(2,window.devicePixelRatio));
+renderer.setSize(innerWidth,innerHeight);
+renderer.xr.enabled=true;
+document.body.appendChild(renderer.domElement);
+const scene=new THREE.Scene();
+const BG=new THREE.Color(COL.bg);
+scene.background=BG;
+const camera=new THREE.PerspectiveCamera(50,innerWidth/innerHeight,0.01,60);
+scene.add(new THREE.HemisphereLight(0xffffff,0x3a4a45,1.5));
+const sun=new THREE.DirectionalLight(0xffffff,1.6);sun.position.set(1.5,3,2);scene.add(sun);
+const world=new THREE.Group();scene.add(world);           // 'local' uzayda yükseklik düzeltmesi için
+const floor=new THREE.GridHelper(8,40,0x34453f,0x26332f);world.add(floor);
+
+const R=0.25, CENTER=new THREE.Vector3(0,1.38,-0.95);
+const rig=new THREE.Group();rig.position.copy(CENTER);rig.scale.setScalar(R);world.add(rig);
+{const Q=rotFromTo(HOME[1],[0,1,0]),M=mm(rotMat([0,1,0],0.42),Q);
+ rig.quaternion.setFromRotationMatrix(new THREE.Matrix4().set(M[0][0],M[0][1],M[0][2],0,M[1][0],M[1][1],M[1][2],0,M[2][0],M[2][1],M[2][2],0,0,0,0,1));}
+
+function canvasTex(w,h,draw){const c=document.createElement("canvas");c.width=w;c.height=h;const t=new THREE.CanvasTexture(c);t.colorSpace=THREE.SRGBColorSpace;t.anisotropy=4;
+  const api={canvas:c,ctx:c.getContext("2d"),tex:t,redraw(){draw(api.ctx,w,h);t.needsUpdate=true;}};api.redraw();return api;}
+function fsOf(ctx){const m=ctx.font.match(/(\d+(?:\.\d+)?)px/);return m?parseFloat(m[1]):30;}
+function drawArrow(ctx,x1,y,x2,both,fs){ctx.save();ctx.strokeStyle=ctx.fillStyle;ctx.lineWidth=Math.max(2,fs*.075);ctx.lineCap="round";ctx.lineJoin="round";const hs=fs*.2;
+  ctx.beginPath();ctx.moveTo(x1,y);ctx.lineTo(x2,y);ctx.moveTo(x2-hs,y-hs*.8);ctx.lineTo(x2,y);ctx.lineTo(x2-hs,y+hs*.8);
+  if(both){ctx.moveTo(x1+hs,y-hs*.8);ctx.lineTo(x1,y);ctx.lineTo(x1+hs,y+hs*.8);}ctx.stroke();ctx.restore();}
+function richParts(t){return t.split(/(→|↔)/).filter(Boolean);}
+function measureRich(ctx,t){const fs=fsOf(ctx);return richParts(t).reduce((w,p)=>w+(p==="→"||p==="↔"?fs*1.2:ctx.measureText(p).width),0);}
+function fillRich(ctx,t,x,y){const fs=fsOf(ctx),ay=ctx.textBaseline==="middle"?y:y-fs*.3;let cx=x;
+  for(const p of richParts(t)){if(p==="→"||p==="↔"){drawArrow(ctx,cx+fs*.15,ay,cx+fs*1.05,p==="↔",fs);cx+=fs*1.2;}else{ctx.fillText(p,cx,y);cx+=ctx.measureText(p).width;}}
+  return cx-x;}
+function rr(ctx,x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath();}
+
+/* yüzler */
+const faceGeo=new THREE.BufferGeometry();faceGeo.setAttribute("position",new THREE.BufferAttribute(new Float32Array(36),3));
+const faceMesh=new THREE.Mesh(faceGeo,new THREE.MeshStandardMaterial({color:0xF4F8F6,emissive:0x26312e,transparent:true,opacity:0.34,side:THREE.DoubleSide,depthWrite:false,roughness:.9}));
+rig.add(faceMesh);
+/* ayrıtlar */
+const cylGeo=new THREE.CylinderGeometry(1,1,1,14);
+const edgeMats=COL.y.map(c=>new THREE.MeshStandardMaterial({color:c,emissive:c,emissiveIntensity:.35,roughness:.45}));
+const hitMat=new THREE.MeshBasicMaterial({visible:false});
+const edgeObjs=EDGES.map(([a,b])=>{const j=edgePair(a,b);const m=new THREE.Mesh(cylGeo,edgeMats[j]);m.userData.r=0.032;rig.add(m);
+  const h=new THREE.Mesh(cylGeo,hitMat);h.userData={type:"edge",a,b,r:0.1};rig.add(h);
+  const tag=canvasTex(128,96,(ctx,w,hh)=>{ctx.clearRect(0,0,w,hh);ctx.font=`italic 600 64px ${FMATH}`;ctx.textAlign="center";ctx.textBaseline="middle";
+    ctx.lineWidth=8;ctx.strokeStyle=COL.bg;ctx.strokeText(Y(j),w/2,hh/2);ctx.fillStyle=COL.y[j];ctx.fillText(Y(j),w/2,hh/2);});
+  const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:tag.tex,transparent:true,depthWrite:false}));sp.scale.set(0.2,0.15,1);rig.add(sp);
+  return {a,b,j,mesh:m,hit:h,tag:sp,tagTex:tag};});
+/* köşeler */
+const vertObjs=[1,2,3,4].map(k=>{const t=canvasTex(128,128,(ctx,w,h)=>{ctx.clearRect(0,0,w,h);ctx.beginPath();ctx.arc(64,64,56,0,7);ctx.fillStyle=COL.disc;ctx.fill();
+    ctx.lineWidth=7;ctx.strokeStyle=COL.discInk;ctx.stroke();ctx.fillStyle=COL.discInk;ctx.font=`600 72px ${FMATH}`;ctx.textAlign="center";ctx.textBaseline="middle";ctx.fillText(String(k),64,68);});
+  const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:t.tex,depthTest:false,transparent:true}));sp.renderOrder=20;sp.scale.setScalar(0.24);rig.add(sp);
+  const h=new THREE.Mesh(new THREE.SphereGeometry(0.17,12,8),hitMat);h.userData={type:"vertex",k};rig.add(h);
+  return {k,sprite:sp,hit:h,tex:t};});
+/* kılavuzlar: eksen ve ayna */
+const axisGeo=new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0,0,-1.45),new THREE.Vector3(0,0,1.45)]);
+const axisLine=new THREE.Line(axisGeo,new THREE.LineDashedMaterial({color:COL.guide,dashSize:.06,gapSize:.05}));axisLine.computeLineDistances();axisLine.visible=false;rig.add(axisLine);
+const mirrorMesh=new THREE.Mesh(new THREE.PlaneGeometry(2.5,2.5),new THREE.MeshBasicMaterial({color:COL.guide,transparent:true,opacity:.16,side:THREE.DoubleSide,depthWrite:false}));
+mirrorMesh.visible=false;rig.add(mirrorMesh);
+const ZV=new THREE.Vector3(0,0,1),YV=new THREE.Vector3(0,1,0);
+
+function setCyl(m,p,q,r){const a=new THREE.Vector3(...p),b=new THREE.Vector3(...q),d=b.clone().sub(a),l=d.length();
+  m.position.copy(a).add(b).multiplyScalar(.5);m.quaternion.setFromUnitVectors(YV,d.normalize());m.scale.set(r,Math.max(l,1e-4),r);}
+let hovered=new Set();
+function drawModel(overlay){
+  const pos=faceGeo.attributes.position.array;let i=0;
+  for(const f of FACES)for(const k of f){pos[i++]=P[k][0];pos[i++]=P[k][1];pos[i++]=P[k][2];}
+  faceGeo.attributes.position.needsUpdate=true;faceGeo.computeVertexNormals();faceGeo.computeBoundingSphere();
+  for(const e of edgeObjs){const hv=hovered.has(e.hit);setCyl(e.mesh,P[e.a],P[e.b],e.mesh.userData.r*(hv?1.7:1));{const d=sub(P[e.b],P[e.a]);setCyl(e.hit,add(P[e.a],mul(d,.2)),sub(P[e.b],mul(d,.2)),e.hit.userData.r);}
+    e.tag.position.set(...mul(add(P[e.a],P[e.b]),0.5*1.24));}
+  for(const v of vertObjs){v.sprite.position.set(...P[v.k]);v.hit.position.set(...P[v.k]);v.sprite.scale.setScalar(hovered.has(v.hit)?0.3:0.24);}
+  axisLine.visible=!!(overlay&&overlay.axis);mirrorMesh.visible=!!(overlay&&overlay.plane);
+  if(axisLine.visible)axisLine.quaternion.setFromUnitVectors(ZV,new THREE.Vector3(...overlay.axis));
+  if(mirrorMesh.visible)mirrorMesh.quaternion.setFromUnitVectors(ZV,new THREE.Vector3(...overlay.plane));
+}
+
+/* ================= bilgi panosu (sağ) ================= */
+let info={name:"Başlangıç",caption:CAPTION.id,kind:"id",rho:[0,1,2,3,4]};
+const seen=new Set(["1234"]);
+function wrap(ctx,text,maxW){const words=text.split(" ");const lines=[];let cur="";
+  for(const w of words){const t=cur?cur+" "+w:w;if(ctx.measureText(t).width>maxW&&cur){lines.push(cur);cur=w;}else cur=t;}if(cur)lines.push(cur);return lines;}
+const IW=1024,IH=1360;
+const infoTex=canvasTex(IW,IH,(ctx,w,h)=>{
+  ctx.clearRect(0,0,w,h);rr(ctx,4,4,w-8,h-8,22);ctx.fillStyle=COL.panel;ctx.fill();ctx.lineWidth=4;ctx.strokeStyle=COL.rule;ctx.stroke();
+  const L=52,W=w-2*L;let y=78;
+  ctx.textBaseline="alphabetic";ctx.textAlign="left";
+  ctx.fillStyle=COL.muted;ctx.font=`600 24px ${FBODY}`;ctx.fillText("SON HAMLE",L,y);y+=50;
+  ctx.fillStyle=COL.ink;ctx.font=`600 36px ${FBODY}`;for(const ln of wrap(ctx,info.name,W)){ctx.fillText(ln,L,y);y+=46;}
+  ctx.fillStyle=COL.muted;ctx.font=`400 26px ${FBODY}`;if(info.caption){for(const ln of wrap(ctx,info.caption,W)){ctx.fillText(ln,L,y);y+=34;}}
+  y+=50;ctx.fillStyle=COL.ink;ctx.font=`400 68px ${FMATH}`;const cyc=cycleStr(info.rho);ctx.fillText(cyc,L,y);
+  const cw=ctx.measureText(cyc).width;ctx.font=`600 24px ${FBODY}`;const kt=KIND[info.kind],kw=ctx.measureText(kt).width+32;
+  rr(ctx,L+cw+24,y-38,kw,44,22);ctx.strokeStyle=(info.kind==="mirror"||info.kind==="roto")?COL.ink:COL.muted;ctx.lineWidth=3;ctx.stroke();ctx.fillStyle=ctx.strokeStyle;ctx.fillText(kt,L+cw+40,y-8);
+  y+=48;ctx.fillStyle=COL.muted;ctx.font=`600 24px ${FBODY}`;ctx.fillText("KÖKLERİ YER DEĞİŞTİRİNCE y'LER",L,y);y+=22;
+  const t=inducedTau(info.rho),rho=info.rho;
+  for(let j=0;j<3;j++){const [[a,b],[c,d]]=PAIRS[j];rr(ctx,L,y,W,66,10);ctx.fillStyle=COL.soft;ctx.fill();
+    ctx.beginPath();ctx.arc(L+30,y+33,12,0,7);ctx.fillStyle=COL.y[j];ctx.fill();
+    ctx.font=`italic 36px ${FMATH}`;ctx.fillStyle=COL.ink;
+    const s1=`${Y(j)} = ${X(a)}${X(b)} + ${X(c)}${X(d)}   →   ${X(rho[a])}${X(rho[b])} + ${X(rho[c])}${X(rho[d])}  =  `;
+    const s1w=fillRich(ctx,s1,L+58,y+45);ctx.font=`italic 600 38px ${FMATH}`;ctx.fillStyle=COL.y[t[j]];ctx.fillText(Y(t[j]),L+58+s1w,y+45);
+    y+=78;}
+  ctx.fillStyle=COL.ink;ctx.font=`600 30px ${FBODY}`;fillRich(ctx,tauText(t),L,y+24);y+=86;
+  // 24'lük tablo
+  ctx.strokeStyle=COL.rule;ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(L,y-24);ctx.lineTo(w-L,y-24);ctx.stroke();
+  ctx.fillStyle=COL.muted;ctx.font=`600 24px ${FBODY}`;ctx.fillText(`24 SİMETRİ · ${seen.size} / 24 GÖRÜLDÜ`,L,y+10);y+=34;
+  const gap=12,colW=(W-5*gap)/6,cur=sigKey(state);
+  COLS.forEach((tt,ci)=>{const x=L+ci*(colW+gap);let yy=y;
+    ctx.font=`italic 26px ${FMATH}`;ctx.fillStyle=COL.ink;const head=tauHead(tt);
+    ctx.font=head==="hepsi yerinde"?`500 22px ${FBODY}`:`italic 26px ${FMATH}`;fillRich(ctx,head,x+6,yy+30);
+    ctx.font=`400 19px ${FBODY}`;ctx.fillStyle=COL.muted;ctx.fillText(ci===0?"V₄":(ci<3?"dönmeler":"ayna gerekir"),x+6,yy+56);yy+=70;
+    TOUR.filter(g=>g.tau.join("")===tt.join("")).forEach(g=>{const k=sigKey(g.sig),sn=seen.has(k);
+      rr(ctx,x,yy,colW,64,8);if(sn){ctx.fillStyle=COL.soft;ctx.fill();}
+      if(k===cur){ctx.lineWidth=4;ctx.strokeStyle=COL.ink;ctx.stroke();}
+      ctx.globalAlpha=sn||k===cur?1:.4;ctx.fillStyle=COL.ink;ctx.font=`400 27px ${FMATH}`;ctx.fillText(g.cyc,x+10,yy+30);
+      ctx.fillStyle=COL.muted;ctx.font=`400 18px ${FBODY}`;ctx.fillText(KIND_SHORT[g.kind],x+10,yy+54);ctx.globalAlpha=1;yy+=72;});});
+  y+=70+4*72+28;
+  ctx.fillStyle=COL.muted;ctx.font=`400 24px ${FBODY}`;
+  for(const ln of wrap(ctx,"Her sütunda 4 simetri: 24 = 6 × 4, yani S₄/V₄ ≅ S₃. Kâğıt modelle yalnızca ilk üç sütundaki 12 dönme yapılabilir.",W)){ctx.fillText(ln,L,y);y+=32;}
+});
+const infoW=0.66,infoPanel=new THREE.Mesh(new THREE.PlaneGeometry(infoW,infoW*IH/IW),new THREE.MeshBasicMaterial({map:infoTex.tex,transparent:true}));
+world.add(infoPanel);
+
+/* ================= hamle düğmeleri (sol) ================= */
+const PX=1800; // düğme dokusunda metre başına piksel
+const btnPanel=new THREE.Group();world.add(btnPanel);
+const BW=0.6,BH=0.8;
+const btnBg=canvasTex(Math.round(BW*PX),Math.round(BH*PX),(ctx,w,h)=>{ctx.clearRect(0,0,w,h);rr(ctx,4,4,w-8,h-8,24);ctx.fillStyle=COL.panel;ctx.fill();ctx.lineWidth=4;ctx.strokeStyle=COL.rule;ctx.stroke();
+  const lab=(t,yM)=>{ctx.fillStyle=COL.muted;ctx.font=`600 34px ${FBODY}`;ctx.fillText(t,0.035*PX,(BH/2-yM)*PX);};
+  ctx.fillStyle=COL.ink;ctx.font=`700 48px ${FBODY}`;ctx.fillText("Hamleler",0.035*PX,(BH/2-0.335)*PX);
+  lab("Bir köşeden tutup 120° çevir",0.255);lab("Karşılıklı iki ayrıttan tutup 180° çevir",0.115);lab("Aynada yansıt (kâğıtla yapılamaz)",-0.025);});
+const bgMesh=new THREE.Mesh(new THREE.PlaneGeometry(BW,BH),new THREE.MeshBasicMaterial({map:btnBg.tex,transparent:true}));btnPanel.add(bgMesh);
+const buttons=[];
+function makeBtn(label,x,y,w,h,action,opt={}){
+  const t=canvasTex(Math.round(w*PX),Math.round(h*PX),(ctx,cw,ch)=>{ctx.clearRect(0,0,cw,ch);rr(ctx,3,3,cw-6,ch-6,14);ctx.fillStyle=opt.strong?COL.ink:COL.soft;ctx.fill();
+    ctx.lineWidth=4;ctx.strokeStyle=opt.strong?COL.ink:COL.rule;ctx.stroke();ctx.fillStyle=opt.strong?COL.bg:COL.ink;ctx.textAlign="center";ctx.textBaseline="middle";
+    ctx.font=opt.math?`500 50px ${FMATH}`:`600 38px ${FBODY}`;let tx=cw/2;
+    if(opt.dot!==undefined){ctx.beginPath();ctx.arc(30,ch/2,12,0,7);ctx.fillStyle=COL.y[opt.dot];ctx.fill();ctx.fillStyle=COL.ink;tx+=12;}
+    const lbl=typeof label==="function"?label():label;
+    if(/→|↔/.test(lbl)){ctx.textAlign="left";fillRich(ctx,lbl,tx-measureRich(ctx,lbl)/2,ch/2+2);}else ctx.fillText(lbl,tx,ch/2+2);});
+  const m=new THREE.Mesh(new THREE.PlaneGeometry(w,h),new THREE.MeshBasicMaterial({map:t.tex,transparent:true}));
+  m.position.set(x,y,0.006);m.userData={type:"btn",action,tex:t};btnPanel.add(m);buttons.push(m);return m;}
+{const y1=0.185,w4=0.12,g=0.012,x0=-BW/2+0.035+w4/2;
+ [1,2,3,4].forEach((k,i)=>makeBtn(String(k),x0+i*(w4+g),y1,w4,0.075,()=>manual(()=>rotVertex(k)),{math:true}));
+ const w3=0.166;[0,1,2].forEach(i=>{const pr=PAIRS[i];makeBtn(`${pr[0].join("")} · ${pr[1].join("")}`,-BW/2+0.035+w3/2+i*(w3+g),0.045,w3,0.075,()=>manual(()=>halfTurn(pr[0][0],pr[0][1])),{math:true,dot:i});});
+ const M6=[[1,2],[1,3],[1,4],[2,3],[2,4],[3,4]];
+ M6.forEach(([a,b],i)=>makeBtn(`${a} ↔ ${b}`,-BW/2+0.035+w3/2+(i%3)*(w3+g),-0.095-Math.floor(i/3)*0.087,w3,0.075,()=>manual(()=>mirror(a,b)),{math:true}));
+ const w2=(BW-0.07-g)/2;
+ makeBtn("Başa dön",-BW/2+0.035+w2/2,-0.32,w2,0.08,()=>manual(resetHome));
+ var tourBtn=makeBtn(()=>playing?"Turu durdur":"Turu oynat",-BW/2+0.035+w2*1.5+g,-0.32,w2,0.08,toggleTour,{strong:true});}
+
+/* ================= yerleşim ================= */
+function layout(xr){
+  const portrait=!xr&&innerWidth/innerHeight<0.95;
+  if(portrait){btnPanel.position.set(0,0.7,-0.95);btnPanel.rotation.set(0,0,0);infoPanel.position.set(0,2.2,-0.95);infoPanel.rotation.set(0,0,0);
+    const v=(2.35/2)/Math.tan(THREE.MathUtils.degToRad(camera.fov/2))/0.74;controls.target.set(0,1.52,-0.95);camera.position.set(0,1.52,-0.95+v);}
+  else{btnPanel.position.set(-0.86,1.36,-0.84);btnPanel.rotation.set(0,0.55,0);infoPanel.position.set(0.88,1.42,-0.84);infoPanel.rotation.set(0,-0.55,0);
+    controls.target.set(0,1.38,-0.95);const half=1.32,need=half/Math.tan(THREE.MathUtils.degToRad(camera.fov/2))/camera.aspect;camera.position.set(0,1.5,-0.95+Math.max(1.9,need));}
+  controls.update();
+}
+const controls=new OrbitControls(camera,renderer.domElement);controls.enableDamping=true;controls.minDistance=0.4;controls.maxDistance=7;
+layout(false);
+
+/* ================= durum, animasyon ================= */
+const homeP=()=>{const o={};for(let k=1;k<=4;k++)o[k]=HOME[state[k]].slice();return o;};
+const ease=t=>t<.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2;
+function posAt(d,v,t){
+  if(d.type==="rot")return mv(rotMat(d.u,d.ang*ease(t)),v);
+  if(d.type==="mirror")return sub(v,mul(d.n,2*ease(t)*dot(v,d.n)));
+  if(d.type==="roto"){if(t<.55)return mv(rotMat(d.u,d.ang*ease(t/.55)),v);const w=mv(rotMat(d.u,d.ang),v);return sub(w,mul(d.u,2*ease((t-.55)/.45)*dot(w,d.u)));}
+  return v;}
+const overlayAt=(d,t)=>d.type==="rot"?{axis:d.u}:d.type==="mirror"?{plane:d.n}:d.type==="roto"?(t<.55?{axis:d.u}:{plane:d.u}):null;
+function duration(d){if(reduce)return 0;if(d.type==="rot")return Math.abs(d.ang)>Math.PI+.1?2300:(Math.abs(d.ang)>3?1800:1500);if(d.type==="mirror")return 1700;if(d.type==="roto")return 2900;return 0;}
+function runMove(d,done){const P0={};for(let k=1;k<=4;k++)P0[k]=P[k].slice();const dur=duration(d);
+  if(!dur){done();return;}anim={d,P0,t0:performance.now(),dur,done};}
+function finishAnimNow(){if(!anim)return;const cb=anim.done;anim=null;cb();}
+function settle(){P=homeP();drawModel(null);seen.add(sigKey(state));infoTex.redraw();}
+function setInfo(name,kind,rho,caption){info={name,kind,rho,caption};infoTex.redraw();}
+
+function tourGo(i){clearTimeout(tourTimer);clearTimeout(startTimer);anim=null;
+  tourIdx=(i+24)%24;const g=TOUR[tourIdx];state=[0,1,2,3,4];P=homeP();drawModel(null);
+  setInfo(g.name,g.kind,g.sig,`${tourIdx+1} / 24 · ${CAPTION[g.kind]}`);
+  startTimer=setTimeout(()=>runMove(g.anim,()=>{state=g.sig.slice();settle();if(playing)tourTimer=setTimeout(()=>tourGo(tourIdx+1),reduce?2800:1800);}),reduce?0:350);}
+function toggleTour(){playing=!playing;tourBtn.userData.tex.redraw();clearTimeout(tourTimer);clearTimeout(startTimer);if(playing&&!anim)tourGo(tourIdx+1);}
+function manual(fn){ // elle hamle: turu durdurur, yarım kalan tur hamlesini bitirir
+  if(playing){playing=false;tourBtn.userData.tex.redraw();clearTimeout(tourTimer);clearTimeout(startTimer);}
+  if(anim){if(anim.manual)return;finishAnimNow();}
+  fn();}
+function applySpatial(M,d,name){const g=findByM(roundM(M));if(!g)return;
+  const inv=[0];for(let k=1;k<=4;k++)inv[state[k]]=k;const rho=[0];for(let k=1;k<=4;k++)rho[k]=inv[g.sig[state[k]]];
+  setInfo(name,g.kind,rho,"");
+  runMove(d,()=>{const ns=[0];for(let k=1;k<=4;k++)ns[k]=g.sig[state[k]];state=ns;settle();});
+  if(anim)anim.manual=true;}
+function rotVertex(k){const u=HOME[state[k]];applySpatial(rotMat(u,2*Math.PI/3),{type:"rot",u,ang:2*Math.PI/3},`${k} köşesinden geçen eksen etrafında 120°`);}
+function halfTurn(a,b){const m=add(HOME_INT[state[a]],HOME_INT[state[b]]),i=[0,1,2].find(i=>m[i]!==0),M=[[-1,0,0],[0,-1,0],[0,0,-1]];M[i][i]=1;const pr=PAIRS[edgePair(a,b)];
+  applySpatial(M,{type:"rot",u:AXES[i],ang:Math.PI},`${pr[0].join("")} ve ${pr[1].join("")} ayrıtlarının ortasından geçen eksen etrafında 180°`);}
+function mirror(a,b){const n=unit(sub(HOME[state[a]],HOME[state[b]])),M=[0,1,2].map(i=>[0,1,2].map(j=>(i===j?1:0)-2*n[i]*n[j]));
+  applySpatial(M,{type:"mirror",n},`${a} ile ${b} köşelerini takas eden ayna`);}
+function resetHome(){state=[0,1,2,3,4];setInfo("Başlangıç","id",[0,1,2,3,4],"");settle();}
+
+/* ================= seçme: fare, dokunma, kumanda, el ================= */
+const ray=new THREE.Raycaster(),tmpM=new THREE.Matrix4();
+const pickables=()=>[...vertObjs.map(v=>v.hit),...edgeObjs.map(e=>e.hit),...buttons];
+function hitFromRay(){const hs=ray.intersectObjects(pickables(),false);if(!hs.length)return null;
+  const v=hs.find(h=>h.object.userData.type==="vertex");return v&&v.distance<hs[0].distance+0.06?v:hs[0];}
+function activate(obj){const u=obj.userData;if(u.type==="btn")u.action();else if(u.type==="vertex")manual(()=>rotVertex(u.k));else if(u.type==="edge")manual(()=>halfTurn(u.a,u.b));}
+function setHover(list){hovered=new Set(list);for(const b of buttons)b.material.color.set(hovered.has(b)?0xC9DBFF:0xffffff);if(!anim)drawModel(null);}
+// fare / dokunma
+const ndc=new THREE.Vector2();let down=null;
+function rayFromPointer(e){const r=renderer.domElement.getBoundingClientRect();ndc.set(((e.clientX-r.left)/r.width)*2-1,-((e.clientY-r.top)/r.height)*2+1);ray.setFromCamera(ndc,camera);}
+renderer.domElement.addEventListener("pointerdown",e=>{down={x:e.clientX,y:e.clientY};});
+renderer.domElement.addEventListener("pointerup",e=>{if(!down)return;const moved=Math.hypot(e.clientX-down.x,e.clientY-down.y)>6;down=null;if(moved||renderer.xr.isPresenting)return;
+  rayFromPointer(e);const h=hitFromRay();if(h)activate(h.object);});
+renderer.domElement.addEventListener("pointermove",e=>{if(renderer.xr.isPresenting||e.pointerType==="touch")return;rayFromPointer(e);const h=hitFromRay();
+  renderer.domElement.style.cursor=h?"pointer":"grab";const want=h?[h.object]:[];if(idKey([...hovered])!==idKey(want))setHover(want);});
+// XR kumandaları ve eller
+const controllers=[],modelFactory=new XRControllerModelFactory();
+const rayLineGeo=new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0,0,0),new THREE.Vector3(0,0,-1)]);
+for(let i=0;i<2;i++){const c=renderer.xr.getController(i);
+  const line=new THREE.Line(rayLineGeo,new THREE.LineBasicMaterial({color:COL.guide,transparent:true,opacity:.85}));line.scale.z=2.5;c.add(line);c.userData.line=line;
+  c.addEventListener("select",()=>{rayFromController(c);const h=hitFromRay();if(h)activate(h.object);});
+  c.addEventListener("connected",ev=>{c.userData.hand=!!ev.data.hand;});
+  scene.add(c);controllers.push(c);
+  try{const grip=renderer.xr.getControllerGrip(i);grip.add(modelFactory.createControllerModel(grip));scene.add(grip);}catch(_){}
+}
+function rayFromController(c){tmpM.identity().extractRotation(c.matrixWorld);ray.ray.origin.setFromMatrixPosition(c.matrixWorld);ray.ray.direction.set(0,0,-1).applyMatrix4(tmpM);}
+
+/* ================= XR oturumu ================= */
+const msg=document.getElementById("msg"),bVR=document.getElementById("btn-vr"),bAR=document.getElementById("btn-ar");
+async function checkXR(){
+  if(!("xr" in navigator)){msg.textContent="Bu tarayıcı WebXR desteklemiyor; sahneyi burada 3B olarak inceleyebilirsiniz. VR için Meta Quest tarayıcısıyla açın.";return;}
+  try{if(await navigator.xr.isSessionSupported("immersive-vr"))bVR.hidden=false;}catch(_){}
+  try{if(await navigator.xr.isSessionSupported("immersive-ar"))bAR.hidden=false;}catch(_){}
+  if(bVR.hidden&&bAR.hidden)msg.textContent="Bu cihazda VR/AR oturumu açılamıyor; sahneyi burada 3B olarak inceleyebilirsiniz.";
+}
+let xrMode=null;
+async function startXR(mode){
+  try{
+    const session=await navigator.xr.requestSession(mode,{optionalFeatures:["local-floor","bounded-floor","hand-tracking"]});
+    xrMode=mode;
+    if(mode==="immersive-ar"){scene.background=null;floor.visible=false;}
+    try{renderer.xr.setReferenceSpaceType("local-floor");await renderer.xr.setSession(session);world.position.y=0;}
+    catch(_){renderer.xr.setReferenceSpaceType("local");await renderer.xr.setSession(session);world.position.y=-1.45;}
+    controls.enabled=false;layout(true);
+    session.addEventListener("end",()=>{xrMode=null;scene.background=BG;floor.visible=true;world.position.y=0;controls.enabled=true;layout(false);});
+  }catch(err){msg.textContent="Oturum başlatılamadı: "+(err&&err.message?err.message:err);}
+}
+bVR.addEventListener("click",()=>startXR("immersive-vr"));
+bAR.addEventListener("click",()=>startXR("immersive-ar"));
+checkXR();
+
+/* ================= döngü ================= */
+addEventListener("resize",()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);if(!renderer.xr.isPresenting)layout(false);});
+renderer.setAnimationLoop(now=>{
+  if(anim){const t=Math.min(1,(performance.now()-anim.t0)/anim.dur);for(let k=1;k<=4;k++)P[k]=posAt(anim.d,anim.P0[k],t);drawModel(overlayAt(anim.d,t));
+    if(t>=1){const cb=anim.done;anim=null;cb();}}
+  if(renderer.xr.isPresenting){const hv=[];
+    for(const c of controllers){rayFromController(c);const h=hitFromRay();c.userData.line.scale.z=h?h.distance:2.5;if(h)hv.push(h.object);}
+    if(idKey(hv)!==idKey([...hovered]))setHover(hv);}
+  else controls.update();
+  renderer.render(scene,camera);
+});
+
+/* başlat */
+P=homeP();drawModel(null);
+if(document.fonts&&document.fonts.load)Promise.all(['400 40px "STIX Two Text"','italic 400 40px "STIX Two Text"','600 40px "STIX Two Text"','italic 600 40px "STIX Two Text"','400 40px "IBM Plex Sans"','600 40px "IBM Plex Sans"'].map(f=>document.fonts.load(f).catch(()=>null))).then(()=>{infoTex.redraw();btnBg.redraw();buttons.forEach(b=>b.userData.tex.redraw());vertObjs.forEach(v=>v.tex.redraw());edgeObjs.forEach(e=>e.tagTex.redraw());});
+if(reduce){playing=false;tourBtn.userData.tex.redraw();setInfo(TOUR[0].name,"id",TOUR[0].sig,CAPTION.id);}else tourGo(0);
+
+/* test için */
+window.__vr={state:()=>state.slice(),seen:()=>seen.size,info:()=>info,playing:()=>playing,
+  screenOf:(m)=>{const v=new THREE.Vector3();m.getWorldPosition(v);v.project(camera);return [(v.x+1)/2*innerWidth,(1-v.y)/2*innerHeight];},
+  buttons,vertObjs};
+</script>
+</body>
+</html>
